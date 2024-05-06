@@ -1,23 +1,8 @@
 # TiltRec
 
-
 ## Introduction
 
 **TiltRec** is an efficient software tool for cryo-electron tomography reconstruction using MPI and CUDA.
-
-## 目录
-
-- [TiltRec](#tiltrec)
-  - [Introduction](#introduction)
-  - [目录](#目录)
-    - [System Requirements and Dependencies](#system-requirements-and-dependencies)
-  - [Compilation Instructions](#compilation-instructions)
-    - [Without Docker](#without-docker)
-    - [Using Docker](#using-docker)
-  - [Command-Line Options](#command-line-options)
-  - [Parameters](#parameters)
-  - [Example](#example)
-
 
 ### System Requirements and Dependencies
 - CMake: Version 2.6 or newer.
@@ -43,8 +28,6 @@ cd build
 cmake ..
 make -j8
 ```
-
-
 
 ## Command-Line Options
 TiltRec provides a variety of command-line options to allow users more flexibility when running cryo-ET reconstructions. The basic command-line structure is as follows:
