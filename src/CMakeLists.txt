@@ -1,0 +1,11 @@
+
+add_subdirectory(filter)
+add_subdirectory(util)
+add_subdirectory(mrcmx)
+add_subdirectory(opts)
+add_subdirectory(reconstruction_z)
+add_subdirectory(reconstruction_y)
+add_subdirectory(main-cuda)
+add_subdirectory(main-cuda-z)
+add_subdirectory(main-mpi-y)
+add_subdirectory(main-mpi-z)
