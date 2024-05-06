@@ -33,7 +33,7 @@ make -j8
 TiltRec provides a variety of command-line options to allow users more flexibility when running cryo-ET reconstructions. The basic command-line structure is as follows:
 
 ```bash
-mpirun -n p ./ycuda [options]
+mpirun -n p ./TiltRec [options]
 ```
 
 ## Parameters
@@ -65,5 +65,5 @@ mpirun -n p ./ycuda [options]
 ## Example
 The following example demonstrates how to perform a reconstruction using the Weighted Back Projection (WBP) method along the y-axis with two threads:
 ```bash
-mpirun -n 2 ./ycuda --input ../../data/BBb/BBb_fin.mrc --output ../../data/BBb/BBb_SIRT_y.mrc --tiltfile ../../data/BBb/BBb.rawtlt --geometry 0,0,0,300 --method WBP
+mpirun -n 2 ./TiltRec-cuda --input ../../data/BBb/BBb_fin.mrc --output ../../data/BBb/BBb_SIRT_y.mrc --tiltfile ../../data/BBb/BBb.rawtlt --geometry 0,0,0,300 --method WBP
 ```
