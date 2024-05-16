@@ -35,7 +35,7 @@ void UsageDual()
 			  << std::endl;
 	std::cout << "    SIRT: SIRT,iteration_number,relax_paramete \n"
 			  << std::endl;
-	std::cout << "    ADMM: ADMM,iteration_number,relax_paramete \n"
+	std::cout << "    ADMM: ADMM,iteration_number,cgiter,relax_paramete,soft \n"
 			  << std::endl;
 	std::cout << "-help(-h)" << std::endl;
 	std::cout << "    Help Information\n"
