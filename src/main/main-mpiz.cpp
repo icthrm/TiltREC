@@ -20,7 +20,7 @@ void TestMrcWriteToFile(MrcStackM &testMrc, const char *filename)
 	testMrc.WriteToFile(filename);
 }
 
-// 只写第150层的mrc
+
 void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float *blockdata)
 {
 	if (not('z' == axis || 'Z' == axis))
@@ -33,12 +33,12 @@ void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float 
 	{
 		int num = end - start;
 		int sliceSize = testMrc.header.nx * testMrc.header.ny;
-		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize); // WriteBlock函数不包括end
+		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize); 
 	}
 }
 
 struct Coeff
-{ // 20个双精度数，前10个是a后10个是b
+{
 	union
 	{
 		double p[20];
@@ -655,16 +655,6 @@ int ATOM(options &opt, int myid, int procs)
 	std::vector<float> angles;
 	ReadAngles(angles, opt.angle);
 
-	//	std::vector<float> xangles;
-
-	// if (opt.xangle[0] != '\0')
-	// {
-	// 	ReadAngles(xangles, opt.xangle);
-	// }
-	// else
-	// {
-	// 	xangles.resize(angles.size(), 0.0);
-	// }
 
 	std::vector<Coeff> params;
 	TranslateAngleToCoefficients(angles, params);
@@ -723,7 +713,6 @@ int ATOM(options &opt, int myid, int procs)
 	catch (std::bad_alloc &ba)
 	{
 		std::cerr << "Failed to allocate memory: " << ba.what() << '\n';
-		// 处理内存分配失败的情况
 	}
 
 	/**********************reconstruction along Z-axis*******************/
@@ -732,7 +721,6 @@ int ATOM(options &opt, int myid, int procs)
 	{
 		size_t batchSize = vol.width * vol.length * 2;
 		size_t totalSize = static_cast<size_t>(vol.width) * static_cast<size_t>(vol.length) * static_cast<size_t>(vol.height);
-		// printf("size:%llu\n", totalSize);
 		float *ptr = vol.data;
 		for (size_t i = 0; i < totalSize; i += batchSize)
 		{
@@ -740,7 +728,6 @@ int ATOM(options &opt, int myid, int procs)
 			memset(ptr, 0, currentBatchSize * sizeof(float));
 			ptr += currentBatchSize;
 		}
-		// printf("sart\n");
 	}
 	else
 	{

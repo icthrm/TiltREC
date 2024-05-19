@@ -11,11 +11,10 @@ find_package(MPI REQUIRED)
 find_package(OpenCV REQUIRED)
 
 include_directories(SYSTEM ${PROJECT_SOURCE_DIR} ${MPI_INCLUDE_PATH})
-include_directories(/usr/local/cuda-11.1/targets/x86_64-linux/include)
+#include_directories(/usr/local/cuda-11.1/targets/x86_64-linux/include)
 
-# Pass options to NVCC
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3)
-# list(APPEND CMAKE_CXX_FLAGS "-std=c++0x -O3 -ffast-math -Wall")
+
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-lcufftw -lcufft -lculibos)
 set(CUDA_ARCH_LIST "Auto" CACHE STRING "List of CUDA architectures (e.g. 52, 61, 75)")

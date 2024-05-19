@@ -20,7 +20,6 @@ void TestMrcWriteToFile(MrcStackM &testMrc, const char *filename)
 	testMrc.WriteToFile(filename);
 }
 
-// 只写第150层的mrc
 void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float *blockdata)
 {
 	if (not('z' == axis || 'Z' == axis))
@@ -38,7 +37,7 @@ void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float 
 }
 
 struct Coeff
-{ // 20个双精度数，前10个是a后10个是b
+{
 	union
 	{
 		double p[20];
@@ -281,19 +280,15 @@ void Reproject(const Point3DF &origin, const Volume &vol, const Coeff &coeff,
 	Point3D coord;
 	int n;
 
-	// for (int z = 0; z < thickness; z++)
 	for (int y = 0; y < length; y++)
 	{
-		// float *vdrefz = vol.data + z * (size_t)width * length;
-		// coord.z = z;
+
 		float *vdrefy = vol.data + y * (size_t)width * thickness;
 		coord.y = y;
 
-		// for (int y = 0; y < length; y++)
 		for (int z = 0; z < thickness; z++)
 		{
-			// float *vdrefy = vdrefz + y * width;
-			// coord.y = y;
+
 			float *vdrefz = vdrefy + z * (size_t)width;
 			coord.z = z;
 			for (int x = 0; x < width; x++)
@@ -406,15 +401,11 @@ void BilinearValue(int width, int length, float *proj, const Weight &wt, float *
 void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 				 Coeff coeffv[], int start, int length, Slice &proj, int thickness)
 {
-	// Slice proj(projs.X(), projs.Y());
-	// Slice proj(projs.X(), length);
-	Point3D coord;
 
-	// memset(vol.data, 0, sizeof(float) * length * vol.width * vol.height);
+	Point3D coord;
 
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
-		printf("Begin to read %d projection\n", idx);
 		float *oneproj = proj.data + projs.X() * length * idx;
 
 		for (int y = 0; y < length; y++)
@@ -456,7 +447,7 @@ void FBP(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 	ApplyFilterInplace(projs, proj.data, length, filterMode);
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
-		printf("BPT begin to read %d projection\n", idx);
+		printf("FBP begin to read %d projection\n", idx);
 		float *oneproj = proj.data + projs.X() * length * idx;
 
 		for (int y = 0; y < length; y++)
@@ -494,20 +485,14 @@ void UpdateVolumeByProjDiff(const Point3DF &origin, float *diff,
 
 	Point3D coord;
 
-	// for (int z = 0; z < thickness; z++)
 	for (int y = 0; y < length; y++)
 	{
-		// float *vdrefz = vol.data + z * (size_t)width * length;
-		// coord.z = z;
-
 		float *vdrefy = vol.data + y * (size_t)width * thickness;
 		coord.y = y;
 
-		// for (int y = 0; y < length; y++)
 		for (int z = 0; z < thickness; z++)
 		{
-			// float *vdrefy = vdrefz + y * width;
-			// coord.y = y;
+
 			float *vdrefz = vdrefy + z * (size_t)width;
 			coord.z = z;
 			for (int x = 0; x < width; x++)
@@ -535,21 +520,16 @@ void UpdateWeightsByProjDiff(const Point3DF &origin, float *diff,
 
 	Point3D coord;
 
-	// for (int z = 0; z < values.height; z++)
 	for (int y = 0; y < length; y++)
 	{
-		// float *vdrefz = values.data + z * (size_t)values.width * values.length;
-		// float *wdrefz = weights.data + z * (size_t)weights.width * weights.length;
-		// coord.z = z + values.z;
+
 		float *vdrefy = values + y * static_cast<size_t>(width * thickness);
 		float *wdrefy = weights + y * static_cast<size_t>(width * thickness);
 		coord.y = y;
-		//	for (int y = 0; y < values.length; y++)
+
 		for (int z = 0; z < thickness; z++)
 		{
-			// float *vdrefy = vdrefz + y * values.width;
-			// float *wdrefy = wdrefz + y * weights.width;
-			// coord.y = y + values.y;
+
 			float *vdrefz = vdrefy + z * width;
 			float *wdrefz = wdrefy + z * width;
 			coord.z = z;
@@ -563,7 +543,6 @@ void UpdateWeightsByProjDiff(const Point3DF &origin, float *diff,
 				float s = 0, c = 0;
 
 				ValCoef(origin, coord, coeff, &wt);
-				// BilinearValue(diff, wt, &s, &c);
 				BilinearValue(width, length, diff, wt, &s, &c);
 				*vdrefx += s;
 				*wdrefx += c;
@@ -593,15 +572,7 @@ void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 		  ,
 		  int start, int length, Slice &proj, int thickness)
 {
-	// int pxsize = projs.X() * projs.Y();
-	// Slice reproj_val(projs.X(), projs.Y()); // reprojection value
-	// Slice reproj_wt(projs.X(), projs.Y());	// reprojection weight
-	// Slice projection(projs.X(), projs.Y());
-	// int pxsize = projs.X() * length;
-	// size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
-	// Slice reproj_val(projs.X(), length, NULL); // reprojection value
-	// Slice reproj_wt(projs.X(), length, NULL);  // reprojection weight
-	//  Slice projection(projs.X(), length);
+
 	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X());
 	float *reproj_val = (float *)malloc(sizeof(float) * pxsize);
 	float *reproj_wt = (float *)malloc(sizeof(float) * pxsize);
@@ -616,15 +587,10 @@ void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 
 			Reproject(origin, vol, coeffv[idx], reproj_val, reproj_wt, thickness, length, projs.X());
 
-			// MPI_Allreduce(MPI_IN_PLACE, reproj_val, pxsize, MPI_FLOAT, MPI_SUM,
-			// 			  MPI_COMM_WORLD);
-			// MPI_Allreduce(MPI_IN_PLACE, reproj_wt, pxsize, MPI_FLOAT, MPI_SUM,
-			// 			  MPI_COMM_WORLD);
-
 			printf("SART begin to read %d projection (iteraion "
 				   "%d)\n",
 				   idx, i);
-			// projs.ReadSliceZ(idx, projection.data);
+
 			float *projectiondata = proj.data + projs.X() * length * idx;
 			for (int n = 0; n < pxsize; n++)
 			{
@@ -647,23 +613,13 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 {
 
 	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X());
-	// Slice reproj_val(projs.X(), projs.Y()); // reprojection value
-	// Slice reproj_wt(projs.X(), projs.Y());	// reprojection weight
-	// Slice projection(projs.X(), projs.Y());
+
 	float *reproj_val = (float *)malloc(sizeof(float) * pxsize);
 	float *reproj_wt = (float *)malloc(sizeof(float) * pxsize);
 
-	// Volume valvol(vol.x, vol.y, vol.z, vol.length, vol.width, vol.height);
-	// Volume wtvol(vol.x, vol.y, vol.z, vol.length, vol.width, vol.height);
 	size_t size = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(thickness);
 	float *valvol = (float *)malloc(sizeof(float) * size);
 	float *wtvol = (float *)malloc(sizeof(float) * size);
-	// if (wtvol == NULL)
-	// {
-	// 	// 如果malloc返回NULL，打印错误信息并退出程序
-	// 	std::cerr << "内存分配失败。" << std::endl;
-	// 	exit(1);
-	// }
 
 	for (int i = 0; i < iteration; i++)
 	{
@@ -675,20 +631,8 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 			memset(reproj_val, 0, sizeof(float) * pxsize);
 			memset(reproj_wt, 0, sizeof(float) * pxsize);
 
-			// Reproject(origin, vol, coeffv[idx], reproj_val,
-			// 		  reproj_wt); // vol is not changed during iteration
-
 			Reproject(origin, vol, coeffv[idx], reproj_val, reproj_wt, thickness, length, projs.X());
 
-			// MPI_Allreduce(MPI_IN_PLACE, reproj_val, pxsize, MPI_FLOAT, MPI_SUM,
-			// 			  MPI_COMM_WORLD);
-			// MPI_Allreduce(MPI_IN_PLACE, reproj_wt, pxsize, MPI_FLOAT, MPI_SUM,
-			// 			  MPI_COMM_WORLD);
-
-			// printf("SIRT begin to read %d projection for %d z-coordinate (iteraion "
-			// 	   "%d)\n",
-			// 	   idx, vol.z, i);
-			// projs.ReadSliceZ(idx, projection.data);
 			float *projectiondata = proj.data + projs.X() * length * idx;
 			for (int n = 0; n < pxsize; n++)
 			{
@@ -702,7 +646,6 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 			UpdateWeightsByProjDiff(origin, reproj_val, valvol, wtvol, coeffv[idx], thickness, length, projs.X());
 		}
 
-		// UpdateVolumeByWeights(vol, valvol, wtvol, gamma, thickness, length, projs.X());
 		for (size_t i = size; i--;)
 		{
 			if (wtvol[i])
@@ -740,7 +683,7 @@ int ATOM(options &opt, int myid, int procs)
 		projs.ReadHeader();
 	}
 	MPI_Bcast(&(projs.header), sizeof(MRCheader), MPI_CHAR, 0, MPI_COMM_WORLD);
-	// printf("success\n");
+
 	mrcvol.InitializeHeader();
 	// mrcvol.SetSize(projs.X(), projs.Y(), opt.thickness); // test---------------------
 	mrcvol.SetSize(projs.X(), opt.thickness,
@@ -749,15 +692,7 @@ int ATOM(options &opt, int myid, int procs)
 	ReadAngles(angles, opt.angle);
 
 	std::vector<float> xangles;
-
-	// if (opt.xangle[0] != '\0')
-	// {
-	// 	ReadAngles(xangles, opt.xangle);
-	// }
-	// else
-	// {
 	xangles.resize(angles.size(), 0.0);
-	// }
 
 	std::vector<Coeff> params;
 	TranslateAngleToCoefficients(angles, params);
@@ -769,20 +704,6 @@ int ATOM(options &opt, int myid, int procs)
 
 	DecorateCoefficients(params, geo);
 
-	// int height;
-	// int zrem = mrcvol.Z() % procs;
-	// int volz; // the start slice of reproject per process
-
-	// if (myid < zrem)
-	// {
-	// 	height = mrcvol.Z() / procs + 1;
-	// 	volz = height * myid;
-	// }
-	// else
-	// {
-	// 	height = mrcvol.Z() / procs;
-	// 	volz = height * myid + zrem;
-	// }
 	int length;
 	int yrem = projs.Y() % procs;
 	int start, end; // the start ane end slice of reproject per process
@@ -820,7 +741,6 @@ int ATOM(options &opt, int myid, int procs)
 	origin.y = mrcvol.Y() * .5;
 	origin.z = opt.thickness * .5;
 
-	// Volume vol(0, 0, volz, mrcvol.Y(), mrcvol.X(), height);
 	Volume vol(0, 0, 0, projs.X(), opt.thickness, length,
 			   NULL);
 
@@ -833,7 +753,7 @@ int ATOM(options &opt, int myid, int procs)
 		printf("origin.x is %f, origin.y is %f, origin.z is %f\n", origin.x,
 			   origin.y, origin.z);
 	}
-	// TestMrcWriteToFile(mrcvol, opt.output);
+
 	mrcvol.WriteToFile(opt.output); // test------------------------------
 
 	if (myid == 0)
@@ -896,6 +816,7 @@ int ATOM(options &opt, int myid, int procs)
 
 	if (opt.method == "BPT")
 	{
+	
 		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
 	}
 	else if (opt.method == "SART")
