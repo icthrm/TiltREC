@@ -138,23 +138,28 @@ void ExeRecY(options &opt, Point3DF &origin, MrcStackM &projs, std::vector<SimCo
 {
   if (opt.method == "BPT")
   {
+    printf("Start using BPT for reconstruction.\n  ");
     CuBackProject(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.pitch_angle, start, length, add_left);
   }
   else if (opt.method == "SIRT")
   {
+    printf("Start using SIRT for reconstruction.\n  ");
     CuSIRT(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.iteration, opt.gamma, opt.pitch_angle, start, length, add_left);
   }
   else if (opt.method == "SART")
   {
+    printf("Start using SART for reconstruction. \n ");
     CuSART(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.iteration, opt.gamma, opt.pitch_angle, start, length, add_left);
   }
   else if (opt.method == "FBP")
   {
+    printf("Start using FBP for reconstruction.\n  ");
     ApplyFilterInplace(projs, proj.data, length, 0);
     CuFBP(origin, projs, params, opt.thickness, mrcvol, proj, vol, 0, opt.pitch_angle, start, length, add_left);
   }
   else if (opt.method == "WBP")
   {
+    printf("Start using WBP for reconstruction.\n  ");
     ApplyFilterInplace(projs, proj.data, length, 2);
     CuFBP(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2, opt.pitch_angle, start, length, add_left);
   }
@@ -207,18 +212,18 @@ int ATOM_GPU(options &opt, int myid, int procs)
   }
   end = start + length;
 
-	if (start < add_left)
-	{
-		add_left = start;
-	}
-	else if (start + length < projs.Y())
-	{
-		add_right = projs.Y() - start - length;
-	}
-	else if (start + length >= projs.Y())
-	{
-		add_right = 0;
-	}
+  if (start < add_left)
+  {
+    add_left = start;
+  }
+  else if (start + length < projs.Y())
+  {
+    add_right = projs.Y() - start - length;
+  }
+  else if (start + length >= projs.Y())
+  {
+    add_right = 0;
+  }
   // std::cout << "projs.Y():" << projs.Y() << " length:" << length << std::endl;
   // std::cout << "add_left:" << add_left << "add_right:" << add_right << std::endl;
   Point3DF origin;
@@ -234,7 +239,6 @@ int ATOM_GPU(options &opt, int myid, int procs)
   Volume vol(0, 0, start, projs.X(), opt.thickness, length,
              NULL);
   Slice proj(projs.X(), projs.Y(), NULL);
-
 
   std::cout << myid << ": (" << vol.x << "," << vol.y << "," << vol.z << ")"
             << "&(" << vol.length << "," << length << "," << opt.thickness
@@ -263,25 +267,25 @@ int ATOM_GPU(options &opt, int myid, int procs)
   projs.ReadBlock(start - add_left, end + add_right, 'y', tmp);
   MrcStackM::RotateX(tmp, projs.X(), length, projs.Z(), proj.data); // transfrom to z-order
   delete[] tmp;
- 
+
   if (myid == 0)
   {
 
     ExeRecY(opt, origin, projs, params, mrcvol, proj, vol, start, length, add_left);
   }
 
-  float *nextData = nullptr;               
-  for (int block = 1; block < procs; ++block) 
+  float *nextData = nullptr;
+  for (int block = 1; block < procs; ++block)
   {
 
-    if (myid == 0) 
+    if (myid == 0)
     {
       int nextLength, nextStart, nextAddLeft, nextheight;
       MPI_Recv(&nextLength, 1, MPI_INT, block, block, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Recv(&nextStart, 1, MPI_INT, block, block, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Recv(&nextAddLeft, 1, MPI_INT, block, block, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Recv(&nextheight, 1, MPI_INT, block, block, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      if (nextData) 
+      if (nextData)
       {
         cudaFreeHost(nextData);
         nextData = nullptr;
@@ -294,7 +298,7 @@ int ATOM_GPU(options &opt, int myid, int procs)
       start = nextStart;
       vol.height = nextheight;
       add_left = nextAddLeft;
-   
+
       ExeRecY(opt, origin, projs, params, mrcvol, proj, vol, start, length, add_left);
     }
     else if (myid == block) // 下一个进程
@@ -326,7 +330,6 @@ int ATOM_GPU(options &opt, int myid, int procs)
 
     CHECK_CUDA(cudaFreeHost(proj.data));
   }
-
 
   MPI_Barrier(MPI_COMM_WORLD);
 

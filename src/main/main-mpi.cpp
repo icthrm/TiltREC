@@ -566,10 +566,7 @@ void UpdateVolumeByWeights(Volume &vol, float *values, float *weights,
 }
 
 void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
-		  int iteration // 迭代次数
-		  ,
-		  float gamma // 松弛变量
-		  ,
+		  int iteration, float gamma,
 		  int start, int length, Slice &proj, int thickness)
 {
 
@@ -579,17 +576,13 @@ void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 
 	for (int i = 0; i < iteration; i++)
 	{
-		printf("SART iteraion %d\n", i);
 		for (int idx = 0; idx < projs.Z(); idx++)
 		{
+			printf("Begin to read %d projection (iteraion %d)\n", idx, i);
 			memset(reproj_val, 0, sizeof(float) * pxsize);
 			memset(reproj_wt, 0, sizeof(float) * pxsize);
 
 			Reproject(origin, vol, coeffv[idx], reproj_val, reproj_wt, thickness, length, projs.X());
-
-			printf("SART begin to read %d projection (iteraion "
-				   "%d)\n",
-				   idx, i);
 
 			float *projectiondata = proj.data + projs.X() * length * idx;
 			for (int n = 0; n < pxsize; n++)
@@ -625,9 +618,9 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 	{
 		memset(valvol, 0, sizeof(float) * size);
 		memset(wtvol, 0, sizeof(float) * size);
-		printf("SIRT iteraion %d\n", i);
 		for (int idx = 0; idx < projs.Z(); idx++)
 		{
+			printf("Begin to read %d projection (iteraion %d)\n", idx, i);
 			memset(reproj_val, 0, sizeof(float) * pxsize);
 			memset(reproj_wt, 0, sizeof(float) * pxsize);
 
@@ -816,32 +809,33 @@ int ATOM(options &opt, int myid, int procs)
 
 	if (opt.method == "BPT")
 	{
-	
+		printf("Start using BPT for reconstruction.\n  ");
 		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
 	}
 	else if (opt.method == "SART")
 	{
+		printf("Start using SART for reconstruction. \n ");
 		SART(origin, projs, vol, &params[0], opt.iteration, opt.gamma, start, length, proj, opt.thickness);
 	}
 	else if (opt.method == "SIRT")
 	{
+		printf("Start using SIRT for reconstruction.\n  ");
 		SIRT(origin, projs, vol, &params[0], opt.iteration, opt.gamma, start, length, proj, opt.thickness);
 	}
 	else if (opt.method == "FBP")
 	{
+		printf("Start using FBP for reconstruction.\n  ");
 		ApplyFilterInplace(projs, proj.data, length, 0);
 		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
 	}
 	else if (opt.method == "WBP")
 	{
+		printf("Start using WBP for reconstruction.\n  ");
 		ApplyFilterInplace(projs, proj.data, length, 2);
 		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
 	}
-	// mrcvol.WriteBlock(vol.z, vol.z + height, 'z', vol.data);
-	// if (myid == 0)
-	mrcvol.WriteBlock(start, start + length, 'z', vol.data); // test-------------------------
-	// TestMrcWriteBlock(mrcvol, vol.z, vol.z + height, 'z', vol.data); // test-------------------------
 
+	mrcvol.WriteBlock(start, start + length, 'z', vol.data); 
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (myid == 0)

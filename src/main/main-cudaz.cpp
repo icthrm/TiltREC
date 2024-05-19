@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <ctime>
+#include <cuda.h>
+#include <cuda_runtime.h>
 // #define BLOCKDIM 512
 // #define CHECK_CUDA(func)                                         \
 //   {                                                              \
@@ -142,7 +145,6 @@ void DecorateSimCoefficients(std::vector<SimCoeff> &coeffs,
   }
 }
 
-
 int ATOM_GPUZ(options &opt, int myid, int procs)
 {
   MrcStackM projs, mrcvol;
@@ -210,30 +212,37 @@ int ATOM_GPUZ(options &opt, int myid, int procs)
   /** start cuda logic **/
   InitializeCuda(myid);
 
+
   if (opt.method == "BPT")
   {
+    printf("Start using BPT for reconstruction.\n ");
     CuBackProjectZ(origin, projs, params, opt.thickness, mrcvol, proj, vol);
   }
   else if (opt.method == "FBP")
   {
+    printf("Start using FBP for reconstruction. \n ");
     CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 0);
   }
   else if (opt.method == "WBP")
   {
+    printf("Start using WBP for reconstruction.\n  ");
     CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2);
   }
   else if (opt.method == "SIRT")
   {
+    printf("Start using SIRT for reconstruction. \n ");
     CuSIRTZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
             opt.iteration, opt.gamma);
   }
   else if (opt.method == "SART")
   {
+    printf("Start using SART for reconstruction.\n  ");
     CuSARTZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
             opt.iteration, opt.gamma);
   }
   else if (opt.method == "ADMM")
   {
+    printf("Start using ADMM for reconstruction.\n  ");
     CuADMMZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
             opt.iteration, opt.cgiter, opt.gamma, opt.soft);
   }
@@ -277,14 +286,9 @@ int main(int argc, char *argv[])
   {
     PrintOpts(opts);
   }
-  // if (opts.axis == "y" || opts.axis == "Y")
-  // {
-   // ATOM_GPU(opts, info.id, info.procs);
-  // }
-  // else if (opts.axis == "z" || opts.axis == "Z")
-  // {
-   ATOM_GPUZ(opts, info.id, info.procs);
-  // }
+
+  ATOM_GPUZ(opts, info.id, info.procs);
+
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize(); // parallel finish
 

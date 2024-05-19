@@ -35,7 +35,6 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
 
     for (int z = vol.z; z < vol.z + vol.height; z += steplength)
     {
-        std::cout << "BPT reconstructs " << z  << std::endl;
         if (z + steplength >= vol.z + vol.height)
         { // compenstate for margin
             steplength = vol.z + vol.height - z;
@@ -44,9 +43,9 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
             cudev.z = steplength;
         }
 
-        time_t now = time(NULL);
-        char *curr_time = ctime(&now);
-        std::cout << curr_time << std::endl;
+        // time_t now = time(NULL);
+        // char *curr_time = ctime(&now);
+        // std::cout << curr_time << std::endl;
 
         cudaDeviceSynchronize();
         CUERR
@@ -59,7 +58,7 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
         CUERR
         cudaDeviceSynchronize();
         CUERR
-        printf("Write data to file\n");
+
         {
             int j = 0;
             for (j = 0; j + 20 < thickness; j += 20)
@@ -67,9 +66,9 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
             mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
         }
     }
-    time_t now = time(NULL);
-    char *curr_time = ctime(&now);
-    std::cout << curr_time << std::endl;
+    // time_t now = time(NULL);
+    // char *curr_time = ctime(&now);
+    // std::cout << curr_time << std::endl;
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
     cudaFree(originalProjsData);
@@ -153,7 +152,6 @@ void CuSIRTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     cudaDeviceSynchronize();
     CUERR
 
-    printf("Writing data to file\n");
     {
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
@@ -229,7 +227,6 @@ void CuSARTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
         }
     }
     {
-        printf("Write data to file\n");
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
             mrcvol.WriteBlock(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
@@ -284,9 +281,7 @@ void CuFBPZ(Point3DF &origin, MrcStackM &projs,
             cudev.z = steplength;
         }
 
-        time_t now = time(NULL);
-        char *curr_time = ctime(&now);
-        std::cout << curr_time << std::endl;
+
 
         cudaDeviceSynchronize();
         CUERR
@@ -300,7 +295,6 @@ void CuFBPZ(Point3DF &origin, MrcStackM &projs,
         CUERR
         cudaDeviceSynchronize();
         CUERR
-        printf("Write data to file\n");
         {
             int j = 0;
             for (j = 0; j + 20 < thickness; j += 20)
@@ -308,9 +302,7 @@ void CuFBPZ(Point3DF &origin, MrcStackM &projs,
             mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
         }
     }
-    time_t now = time(NULL);
-    char *curr_time = ctime(&now);
-    std::cout << curr_time << std::endl;
+
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
     cudaFree(originalProjsData);
@@ -356,7 +348,6 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     cudaEventCreate(&begin);
     cudaEventCreate(&stop);
     cudaEventRecord(begin);
-    std::cout << "ADMM reconstruction started." << std::endl;
 
     float *htb, *x0, *uk, *dk;
     cudaMallocManaged((void **)&htb, sizeof(float) * volsize);
@@ -404,21 +395,21 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     cudaDeviceSynchronize();
     CUERR
 
-    printf("Writing data to file\n");
+
     {
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
             mrcvol.WriteBlock(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
         mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
     }
-    CHECK_CUDA(cudaEventRecord(stop))
-    CHECK_CUDA(cudaEventSynchronize(stop))
-    float milliseconds = 0.0f;
-    CHECK_CUDA(cudaEventElapsedTime(&milliseconds, begin, stop))
-    std::cout << "ADMM reconstruction completed." << std::endl;
-    std::cout << "Reconstruction time: " << milliseconds / 1000.0f << "s." << std::endl;
-    CHECK_CUDA(cudaEventDestroy(begin))
-    CHECK_CUDA(cudaEventDestroy(stop))
+    // CHECK_CUDA(cudaEventRecord(stop))
+    // CHECK_CUDA(cudaEventSynchronize(stop))
+    // float milliseconds = 0.0f;
+    // CHECK_CUDA(cudaEventElapsedTime(&milliseconds, begin, stop))
+    // std::cout << "ADMM reconstruction completed." << std::endl;
+    // std::cout << "Reconstruction time: " << milliseconds / 1000.0f << "s." << std::endl;
+    // CHECK_CUDA(cudaEventDestroy(begin))
+    // CHECK_CUDA(cudaEventDestroy(stop))
     
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);

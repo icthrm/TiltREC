@@ -20,7 +20,6 @@ void TestMrcWriteToFile(MrcStackM &testMrc, const char *filename)
 	testMrc.WriteToFile(filename);
 }
 
-
 void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float *blockdata)
 {
 	if (not('z' == axis || 'Z' == axis))
@@ -33,7 +32,7 @@ void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float 
 	{
 		int num = end - start;
 		int sliceSize = testMrc.header.nx * testMrc.header.ny;
-		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize); 
+		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize);
 	}
 }
 
@@ -353,8 +352,7 @@ void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
-		printf("Begin to read %d projection\n", idx);
-		// printf("BPT begin to read %d projection for %d z-coordinate\n", idx, vol.z);
+
 		projs.ReadSliceZ(idx, proj.data);
 
 		for (int z = 0; z < vol.height; z++)
@@ -410,7 +408,6 @@ void FBP(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
-		printf("Begin to read %d projection\n", idx);
 
 		for (int z = 0; z < vol.height; z++)
 		{
@@ -538,9 +535,10 @@ void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 
 	for (int i = 0; i < iteration; i++)
 	{
-		printf("SART iteraion %d\n", i);
+
 		for (int idx = 0; idx < projs.Z(); idx++)
 		{
+			printf("Begin to read %d projection (iteraion %d)\n", idx, i);
 			memset(reproj_val.data, 0, sizeof(float) * pxsize);
 			memset(reproj_wt.data, 0, sizeof(float) * pxsize);
 
@@ -587,9 +585,10 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 			   sizeof(float) * valvol.length * valvol.width * valvol.height);
 		memset(wtvol.data, 0,
 			   sizeof(float) * wtvol.length * wtvol.width * wtvol.height);
-		printf("SIRT iteraion %d\n", i);
+
 		for (int idx = 0; idx < projs.Z(); idx++)
 		{
+			printf("Begin to read %d projection (iteraion %d)\n", idx, i);
 			memset(reproj_val.data, 0, sizeof(float) * pxsize);
 			memset(reproj_wt.data, 0, sizeof(float) * pxsize);
 
@@ -654,7 +653,6 @@ int ATOM(options &opt, int myid, int procs)
 
 	std::vector<float> angles;
 	ReadAngles(angles, opt.angle);
-
 
 	std::vector<Coeff> params;
 	TranslateAngleToCoefficients(angles, params);
@@ -739,25 +737,27 @@ int ATOM(options &opt, int myid, int procs)
 	}
 	if (opt.method == "BPT")
 	{
-
+		printf("Start using BPT for reconstruction. \n ");
 		BackProject(origin, projs, vol, &params[0]);
 	}
 	else if (opt.method == "SART")
 	{
-
+		printf("Start using SART for reconstruction. \n ");
 		SART(origin, projs, vol, &params[0], opt.iteration, opt.gamma);
 	}
 	else if (opt.method == "SIRT")
 	{
-
+		printf("Start using SIRT for reconstruction.\n  ");
 		SIRT(origin, projs, vol, &params[0], opt.iteration, opt.gamma);
 	}
 	else if (opt.method == "FBP")
 	{
+		printf("Start using FBP for reconstruction. \n ");
 		FBP(origin, projs, vol, &params[0], 0);
 	}
 	else if (opt.method == "WBP")
 	{
+		printf("Start using WBP for reconstruction.\n  ");
 		FBP(origin, projs, vol, &params[0], 2);
 	}
 
