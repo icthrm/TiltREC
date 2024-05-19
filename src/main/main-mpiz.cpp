@@ -1,10 +1,9 @@
 #include "mrcmx/mrcstack.h"
-#include "opts.h"
-// #include "../opts/opts.h"
+#include "../opts/opts-mpi.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
-
+#include "../filter/filter_prj.h"
 #define MILLION 1000000
 
 #define PI_180 0.01745329252f
@@ -311,7 +310,39 @@ inline void BilinearValue(const Slice &slc, const Weight &wt, float *val,
 		*vwt += wt.x_min_del * wt.y_min_del;
 	}
 }
-
+inline void BilinearValue(const Slice &slc, float *slcdata, const Weight &wt, float *val,
+						  float *vwt)
+{
+	int n;
+	if (wt.x_min >= 0 && wt.x_min < slc.width && wt.y_min >= 0 &&
+		wt.y_min < slc.height)
+	{ //(x_min, y_min)
+		n = wt.x_min + wt.y_min * slc.width;
+		*val += (1 - wt.x_min_del) * (1 - wt.y_min_del) * slcdata[n];
+		*vwt += (1 - wt.x_min_del) * (1 - wt.y_min_del);
+	}
+	if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < slc.width && wt.y_min >= 0 &&
+		wt.y_min < slc.height)
+	{ //(x_min+1, y_min)
+		n = wt.x_min + 1 + wt.y_min * slc.width;
+		*val += wt.x_min_del * (1 - wt.y_min_del) * slcdata[n];
+		*vwt += wt.x_min_del * (1 - wt.y_min_del);
+	}
+	if (wt.x_min >= 0 && wt.x_min < slc.width && (wt.y_min + 1) >= 0 &&
+		(wt.y_min + 1) < slc.height)
+	{ //(x_min, y_min+1)
+		n = wt.x_min + (wt.y_min + 1) * slc.width;
+		*val += (1 - wt.x_min_del) * wt.y_min_del * slcdata[n];
+		*vwt += (1 - wt.x_min_del) * wt.y_min_del;
+	}
+	if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < slc.width &&
+		(wt.y_min + 1) >= 0 && (wt.y_min + 1) < slc.height)
+	{ //(x_min+1, y_min+1)
+		n = wt.x_min + 1 + (wt.y_min + 1) * slc.width;
+		*val += wt.x_min_del * wt.y_min_del * slcdata[n];
+		*vwt += wt.x_min_del * wt.y_min_del;
+	}
+}
 void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 				 Coeff coeffv[])
 {
@@ -322,6 +353,7 @@ void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
+		printf("Begin to read %d projection\n", idx);
 		// printf("BPT begin to read %d projection for %d z-coordinate\n", idx, vol.z);
 		projs.ReadSliceZ(idx, proj.data);
 
@@ -352,6 +384,62 @@ void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 			}
 		}
 	}
+	delete[] proj.data;
+}
+
+void FBP(const Point3DF &origin, MrcStackM &projs, Volume &vol,
+		 Coeff coeffv[], int filterMode)
+{
+	size_t projsize = static_cast<size_t>(projs.Y()) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
+
+	Slice proj(projs.X(), projs.Y(), NULL);
+	try
+	{
+		proj.data = new float[projsize];
+	}
+	catch (std::bad_alloc &ba)
+	{
+		std::cerr << "Failed to allocate memory: " << ba.what() << '\n';
+	}
+
+	Point3D coord;
+	memset(vol.data, 0, sizeof(float) * vol.length * vol.width * vol.height);
+
+	projs.ReadBlock(0, projs.Z(), 'z', proj.data);
+	ApplyFilterInplace(projs, proj.data, projs.header.ny, filterMode);
+
+	for (int idx = 0; idx < projs.Z(); idx++)
+	{
+		printf("Begin to read %d projection\n", idx);
+
+		for (int z = 0; z < vol.height; z++)
+		{
+			float *vdrefz = vol.data + z * (size_t)vol.width * vol.length;
+			coord.z = z + vol.z;
+
+			for (int y = 0; y < vol.length; y++)
+			{
+				float *vdrefy = vdrefz + y * (size_t)vol.width;
+				coord.y = y + vol.y;
+
+				for (int x = 0; x < vol.width; x++)
+				{
+					coord.x = x + vol.x;
+					Weight wt;
+					float s = 0, c = 0;
+					float *oneproj = proj.data + projs.X() * projs.Y() * idx;
+					ValCoef(origin, coord, coeffv[idx], &wt);
+					BilinearValue(proj, oneproj, wt, &s, &c);
+
+					if (c)
+					{
+						*(vdrefy + x) += (float)(s / c);
+					}
+				}
+			}
+		}
+	}
+	delete[] proj.data;
 }
 
 void UpdateVolumeByProjDiff(const Point3DF &origin, const Slice &diff,
@@ -532,6 +620,9 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 
 		UpdateVolumeByWeights(vol, valvol, wtvol, gamma);
 	}
+	delete[] reproj_val.data;
+	delete[] reproj_wt.data;
+	delete[] projection.data;
 }
 
 struct SysInfo
@@ -673,6 +764,14 @@ int ATOM(options &opt, int myid, int procs)
 	{
 
 		SIRT(origin, projs, vol, &params[0], opt.iteration, opt.gamma);
+	}
+	else if (opt.method == "FBP")
+	{
+		FBP(origin, projs, vol, &params[0], 0);
+	}
+	else if (opt.method == "WBP")
+	{
+		FBP(origin, projs, vol, &params[0], 2);
 	}
 
 	// TestMrcWriteToFile(mrcvol, opt.output);

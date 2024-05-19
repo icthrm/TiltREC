@@ -4,7 +4,8 @@
 #include <iostream>
 #include <sstream>
 #include <cassert>
-extern "C"{
+extern "C"
+{
 #include <getopt.h>
 }
 #include <string>
@@ -12,25 +13,27 @@ extern "C"{
 #include <stdlib.h>
 #include "util/exception.h"
 
-struct options{
+struct options
+{
 	char input[255];
 	char output[255];
 	char initial[255];
 	char angle[255];
 	char xangle[255];
-	//geometry
+	// geometry
 	float pitch_angle;
 	float zshift;
 	int thickness;
 	float offset;
-	//method
+	// method
 	std::string method;
-	//params for iteration
+	// params for iteration
 	int iteration;
 	float gamma;
 };
 
-inline void UsageDual(){
+inline void UsageDual()
+{
 	std::cout << "[-INPUT(-i) Input Filename]\n"
 			  << std::endl;
 	std::cout << "    MRC file for reconstruction\n"
@@ -55,6 +58,10 @@ inline void UsageDual(){
 			  << std::endl;
 	std::cout << "    Back Projection: BPT\n"
 			  << std::endl;
+	std::cout << "    Filtered Back Projection: FBP\n"
+			  << std::endl;
+	std::cout << "    Weight Back Projection: WBP\n"
+			  << std::endl;
 	std::cout << "    SART: SART,iteration_number,relax_parameter\n"
 			  << std::endl;
 	std::cout << "    SIRT: SIRT,iteration_number,relax_paramete \n"
@@ -68,20 +75,22 @@ inline void UsageDual(){
 			  << std::endl;
 }
 
-inline void PrintOpts(const options& opt){
-	std::cout<<"pitch_angle =  "<<opt.pitch_angle<<std::endl;
-	std::cout<<"zshift = "<<opt.zshift<<std::endl;
-	std::cout<<"thickness = "<<opt.thickness<<std::endl;
-	std::cout<<"offset = "<<opt.offset<<std::endl;
-	std::cout<<"input = "<<opt.input<<std::endl;
-	std::cout<<"output = "<<opt.output<<std::endl;
-	std::cout<<"initial = "<<opt.initial<<std::endl;
-	std::cout<<"method = "<<opt.method<<std::endl;
-	std::cout<<"iter = "<<opt.iteration<<std::endl;
-	std::cout<<"step = "<<opt.gamma<<std::endl;
+inline void PrintOpts(const options &opt)
+{
+	std::cout << "pitch_angle =  " << opt.pitch_angle << std::endl;
+	std::cout << "zshift = " << opt.zshift << std::endl;
+	std::cout << "thickness = " << opt.thickness << std::endl;
+	std::cout << "offset = " << opt.offset << std::endl;
+	std::cout << "input = " << opt.input << std::endl;
+	std::cout << "output = " << opt.output << std::endl;
+	std::cout << "initial = " << opt.initial << std::endl;
+	std::cout << "method = " << opt.method << std::endl;
+	std::cout << "iter = " << opt.iteration << std::endl;
+	std::cout << "step = " << opt.gamma << std::endl;
 }
 
-inline void InitOpts(options* opt){
+inline void InitOpts(options *opt)
+{
 	opt->pitch_angle = 0;
 	opt->zshift = 0;
 	opt->thickness = 0;
@@ -92,22 +101,24 @@ inline void InitOpts(options* opt){
 	opt->xangle[0] = '\0';
 }
 
-inline int GetOpts(int argc, char **argv, options* opts_){
-	
-	static struct option longopts[] ={
-       { "help",            no_argument,            NULL,              'h' },
-		{ "input",    	     required_argument,      NULL,              'i' },
-		{ "output",       required_argument,      NULL,              'o' },
-		{ "initial",        required_argument,      NULL,               'n' },
-		{ "tiltfile",        required_argument,      NULL,              't' },
-       { "geometry",        required_argument,      NULL,              'g' },
-		{ "method",        required_argument,      NULL,              'm' },
-       { NULL,              0,                      NULL,               0  }
-    };
+inline int GetOpts(int argc, char **argv, options *opts_)
+{
+
+	static struct option longopts[] = {
+		{"help", no_argument, NULL, 'h'},
+		{"input", required_argument, NULL, 'i'},
+		{"output", required_argument, NULL, 'o'},
+		{"initial", required_argument, NULL, 'n'},
+		{"tiltfile", required_argument, NULL, 't'},
+		{"geometry", required_argument, NULL, 'g'},
+		{"method", required_argument, NULL, 'm'},
+		{NULL, 0, NULL, 0}};
 
 	int ch;
-	while((ch = getopt_long(argc, argv, "hi:o:n:g:m:a:x:", longopts, NULL)) != -1){
-		switch (ch){
+	while ((ch = getopt_long(argc, argv, "hi:o:n:g:m:a:x:", longopts, NULL)) != -1)
+	{
+		switch (ch)
+		{
 
 		case '?':
 			EX_TRACE("Invalid option '%s'.", argv[optind - 1]);
@@ -121,56 +132,65 @@ inline int GetOpts(int argc, char **argv, options* opts_){
 			UsageDual();
 			return 0;
 
-		case 'i':{
+		case 'i':
+		{
 			std::stringstream iss(optarg);
 			iss >> opts_->input;
-			if(iss.fail()){
+			if (iss.fail())
+			{
 				EX_TRACE("Invalid argument '%s'.", optarg);
 				return -1;
 			}
 		}
 		break;
-		
-		case 't':{
+
+		case 't':
+		{
 			std::stringstream iss(optarg);
 			iss >> opts_->angle;
-			if(iss.fail()){
+			if (iss.fail())
+			{
 				EX_TRACE("Invalid argument '%s'.", optarg);
 				return -1;
 			}
 		}
 		break;
-		
-		//case 'x':{
-		// 	std::stringstream iss(optarg);
-		// 	iss >> opts_->xangle;
-		// 	if(iss.fail()){
-		// 		EX_TRACE("Invalid argument '%s'.", optarg);
-		// 		return -1;
-		// 	}
-		// }
-		// break;
-		
-		case 'o':{
+
+			// case 'x':{
+			//  	std::stringstream iss(optarg);
+			//  	iss >> opts_->xangle;
+			//  	if(iss.fail()){
+			//  		EX_TRACE("Invalid argument '%s'.", optarg);
+			//  		return -1;
+			//  	}
+			//  }
+			//  break;
+
+		case 'o':
+		{
 			std::stringstream iss(optarg);
 			iss >> opts_->output;
-			if(iss.fail()){
+			if (iss.fail())
+			{
 				EX_TRACE("Invalid argument '%s'.", optarg);
 			}
 		}
 		break;
 
-		case 'n':{
+		case 'n':
+		{
 			std::stringstream iss(optarg);
 			iss >> opts_->initial;
 
-			if(iss.fail()){
+			if (iss.fail())
+			{
 				EX_TRACE("Invalid argument '%s'.", optarg);
 			}
 		}
 		break;
 
-		case 'g':{ //offset,xaxistilt,zshift,thickness
+		case 'g':
+		{ // offset,xaxistilt,zshift,thickness
 			std::stringstream iss(optarg);
 			std::string tmp;
 			getline(iss, tmp, ',');
@@ -185,47 +205,60 @@ inline int GetOpts(int argc, char **argv, options* opts_){
 			getline(iss, tmp);
 			opts_->thickness = atoi(tmp.c_str());
 
-			if(iss.fail()){
+			if (iss.fail())
+			{
 				EX_TRACE("Invalid argument '%s'.", optarg);
 				return -1;
 			}
 		}
 		break;
-
-		case 'm':{
+		case 'm':
+		{
 			std::stringstream iss(optarg);
 			std::string tmp;
-			if ( strcmp(optarg,"BPT") && strcmp(optarg,"RP") ){
+			if (strcmp(optarg, "BPT") && strcmp(optarg, "FBP") && strcmp(optarg, "WBP") && strcmp(optarg, "SART") && strcmp(optarg, "SIRT") && strcmp(optarg, "ADMM"))
+			{
 				getline(iss, opts_->method, ',');
-
-				if(opts_->method == "SIRT"||opts_->method == "SART"){
+				if (opts_->method == "SIRT" || opts_->method == "SART")
+				{
 					getline(iss, tmp, ',');
 					opts_->iteration = atoi(tmp.c_str());
 					getline(iss, tmp);
 					opts_->gamma = atof(tmp.c_str());
 				}
-				else{
-					EX_TRACE("Iteration Method: [--method/-m method(BPT,SIRT or SART) Iteration numbers,relax parameter]\n");
+				else
+				{
+					EX_TRACE("Iteration Method: [--mode/-m method(SIRT or SART or ADMM) Iteration numbers,relax parameter]\n"
+							 "FBP Method: [--mode/-m method(FBP or BPT or WBP) ]\n");
 				}
-
 			}
-			else{
+			else
+			{
 				getline(iss, opts_->method);
 			}
-			if(iss.fail()){
-				EX_TRACE("Invalid argument '%s'.", optarg);
+
+			if (iss.eof() == false)
+			{
+				EX_TRACE("Too many arguments for method '%s'.\n", optarg);
+				return -1;
+			}
+
+			if (iss.fail())
+			{
+				EX_TRACE("Invalid argument for method '%s'.\n", optarg);
 				return -1;
 			}
 		}
+
 		break;
 
 		case 0:
-		break;
+			break;
 
 		default:
 			assert(false);
-		} //end switch
-	} //end while
+		} // end switch
+	} // end while
 	return 1;
 }
 

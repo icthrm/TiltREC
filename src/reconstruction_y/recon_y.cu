@@ -7,7 +7,7 @@ void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, float *tmp
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.slice_steplength = volinfo.Y_add_left + volinfo.steplength + volinfo.Y_add_right;
- // volinfo.steplength = max(64, gridYMax);
+  volinfo.steplength = max(64, gridYMax);
   if (y < volinfo.Y_add_left)
   {
     volinfo.Y_add_left = y;
@@ -34,7 +34,7 @@ void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, int y, int
 {
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
- // volinfo.steplength = min(64, gridYMax);
+  volinfo.steplength = min(64, gridYMax);
   volinfo.steplength = min(volinfo.steplength, static_cast<float>(length));
 
   if (y < volinfo.Y_add_left)
@@ -101,7 +101,7 @@ void InitBodyInfo(Bodyinfo &volinfo, float pitch_angle, MrcStackM &projs, int th
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.steplength = 64;
-  //volinfo.steplength = max(64, gridYMax);
+  volinfo.steplength = max(64, gridYMax);
   volinfo.steplength = min(volinfo.steplength, static_cast<float>(length));
   volinfo.slice_steplength = volinfo.Y_add_left + volinfo.steplength + volinfo.Y_add_right;
   volinfo.volsize = (size_t)projs.X() * thickness * volinfo.slice_steplength;
@@ -180,7 +180,7 @@ void CuFBP(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
 
   CuMallocBPTTaskData(cudev, projs.Z(), projs.X(), thickness, volinfo.slice_steplength);
   float oy = origin.y;
-  ApplyFilterInplace(projs, proj.data, length, filterMode);
+ // ApplyFilterInplace(projs, proj.data, length, filterMode);
   for (int y = start; y < start + vol.height; y += volinfo.steplength)
   {
     ReadSliceBlock(vol, volinfo, projs, y, thickness, gridYMax, pitch_angle, start, length);

@@ -26,10 +26,15 @@ list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
-cuda_add_executable(TiltRecZ-cuda ${SOURCES})
+cuda_add_executable(TiltRec-cuda main-cuda.cpp)
+cuda_add_executable(TiltRecZ-cuda main-cudaz.cpp)
+add_executable(TiltRec-mpi main-mpi.cpp)
+add_executable(TiltRecZ-mpi main-mpiz.cpp)
 
-# list(APPEND CMAKE_CXX_FLAGS "-std=c++0x")
 
+target_link_libraries(TiltRec-cuda ${MPI_LIBRARIES} mrcmx filter recon_y opts)
 target_link_libraries(TiltRecZ-cuda ${MPI_LIBRARIES} mrcmx filter recon_z opts)
+target_link_libraries(TiltRec-mpi ${MPI_LIBRARIES} mrcmx filter)
+target_link_libraries(TiltRecZ-mpi ${MPI_LIBRARIES} mrcmx filter)
 
 

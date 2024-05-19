@@ -216,18 +216,18 @@ int ATOM_GPU(options &opt, int myid, int procs)
   }
   end = start + length;
 
-  if (start < add_left)
-  {
-    add_left = start;
-  }
-  if (start + length > projs.Y() && start + length < projs.Y())
-  {
-    add_right = projs.Y() - start - length;
-  }
-  if (start + length >= projs.Y())
-  {
-    add_right = 0;
-  }
+	if (start < add_left)
+	{
+		add_left = start;
+	}
+	else if (start + length < projs.Y())
+	{
+		add_right = projs.Y() - start - length;
+	}
+	else if (start + length >= projs.Y())
+	{
+		add_right = 0;
+	}
   // std::cout << "projs.Y():" << projs.Y() << " length:" << length << std::endl;
   // std::cout << "add_left:" << add_left << "add_right:" << add_right << std::endl;
   // length = length + add_left + add_right;

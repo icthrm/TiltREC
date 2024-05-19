@@ -1,10 +1,9 @@
 #include "mrcmx/mrcstack.h"
-#include "opts.h"
-// #include "../opts/opts.h"
+#include "../opts/opts-mpi.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
-
+#include "../filter/filter_prj.h"
 #define MILLION 1000000
 
 #define PI_180 0.01745329252f
@@ -415,31 +414,23 @@ void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 
 	for (int idx = 0; idx < projs.Z(); idx++)
 	{
-		printf("BPT begin to read %d projection\n", idx);
+		printf("Begin to read %d projection\n", idx);
 		float *oneproj = proj.data + projs.X() * length * idx;
-		// projs.ReadSliceZ(idx, proj.data);
 
-		// for (int z = 0; z < vol.height; z++)
-		// for (int z = 0; z < thickness; z++)
 		for (int y = 0; y < length; y++)
 		{
-			// float *vdrefz = vol.data + z * (size_t)projs.X() * length;
+
 			float *vdrefy = vol.data + y * (size_t)projs.X() * thickness;
-			// coord.z = z + vol.z;
+
 			coord.y = y;
-			// for (int y = 0; y < vol.length; y++)
-			// for (int y = 0; y < length; y++)
+
 			for (int z = 0; z < thickness; z++)
 			{
-				// float *vdrefy = vdrefz + y * (size_t)projs.X();
 				float *vdrefz = vdrefy + z * (size_t)projs.X();
-				// coord.y = y + vol.y;
 				coord.z = z;
 
-				// for (int x = 0; x < projs.X(); x++)
 				for (int x = 0; x < projs.X(); x++)
 				{
-					//	coord.x = x + vol.x;
 					coord.x = x;
 					Weight wt;
 					float s = 0, c = 0;
@@ -457,6 +448,46 @@ void BackProject(const Point3DF &origin, MrcStackM &projs, Volume &vol,
 	}
 }
 
+void FBP(const Point3DF &origin, MrcStackM &projs, Volume &vol,
+		 Coeff coeffv[], int start, int length, Slice &proj, int thickness, int filterMode)
+{
+	Point3D coord;
+
+	ApplyFilterInplace(projs, proj.data, length, filterMode);
+	for (int idx = 0; idx < projs.Z(); idx++)
+	{
+		printf("BPT begin to read %d projection\n", idx);
+		float *oneproj = proj.data + projs.X() * length * idx;
+
+		for (int y = 0; y < length; y++)
+		{
+			float *vdrefy = vol.data + y * (size_t)projs.X() * thickness;
+
+			coord.y = y;
+
+			for (int z = 0; z < thickness; z++)
+			{
+				float *vdrefz = vdrefy + z * (size_t)projs.X();
+				coord.z = z;
+
+				for (int x = 0; x < projs.X(); x++)
+				{
+					coord.x = x;
+					Weight wt;
+					float s = 0, c = 0;
+
+					ValCoef(origin, coord, coeffv[idx], &wt);
+					BilinearValue(projs.X(), length, oneproj, wt, &s, &c);
+
+					if (c)
+					{
+						*(vdrefz + x) += (float)(s / c);
+					}
+				}
+			}
+		}
+	}
+}
 void UpdateVolumeByProjDiff(const Point3DF &origin, float *diff,
 							Volume &vol, float gamma, const Coeff &coeff, int thickness, int length, int width)
 {
@@ -567,10 +598,11 @@ void SART(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 	// Slice reproj_wt(projs.X(), projs.Y());	// reprojection weight
 	// Slice projection(projs.X(), projs.Y());
 	// int pxsize = projs.X() * length;
-	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
+	// size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
 	// Slice reproj_val(projs.X(), length, NULL); // reprojection value
 	// Slice reproj_wt(projs.X(), length, NULL);  // reprojection weight
 	//  Slice projection(projs.X(), length);
+	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X());
 	float *reproj_val = (float *)malloc(sizeof(float) * pxsize);
 	float *reproj_wt = (float *)malloc(sizeof(float) * pxsize);
 
@@ -614,7 +646,7 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 		  int iteration, float gamma, int start, int length, Slice &proj, int thickness)
 {
 
-	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
+	size_t pxsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X());
 	// Slice reproj_val(projs.X(), projs.Y()); // reprojection value
 	// Slice reproj_wt(projs.X(), projs.Y());	// reprojection weight
 	// Slice projection(projs.X(), projs.Y());
@@ -773,11 +805,11 @@ int ATOM(options &opt, int myid, int procs)
 	{
 		add_left = start;
 	}
-	if (start + length > projs.Y() && start + length < projs.Y())
+	else if (start + length < projs.Y())
 	{
 		add_right = projs.Y() - start - length;
 	}
-	if (start + length >= projs.Y())
+	else if (start + length >= projs.Y())
 	{
 		add_right = 0;
 	}
@@ -810,12 +842,6 @@ int ATOM(options &opt, int myid, int procs)
 	}
 	size_t size = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(opt.thickness);
 
-	// printf("size:%llu\n", size);
-	// printf("length:%d\n", vol.length);
-
-	// printf("width:%d\n", vol.width);
-	// printf("height:%d\n", vol.height);
-
 	try
 	{
 		vol.data = new float[size];
@@ -829,16 +855,6 @@ int ATOM(options &opt, int myid, int procs)
 	const char *reference = opt.initial;
 	if (reference[0] != '\0')
 	{
-		// size_t batchSize = projs.X() * length * 2;
-		// size_t totalSize = static_cast<size_t>(projs.X()) * static_cast<size_t>(length) * static_cast<size_t>(opt.thickness);
-		// // printf("size:%llu\n", totalSize);
-		// float *ptr = vol.data;
-		// for (size_t i = 0; i < totalSize; i += batchSize)
-		// {
-		// 	size_t currentBatchSize = std::min(batchSize, totalSize - i);
-		// 	memset(ptr, 0, currentBatchSize * sizeof(float));
-		// 	ptr += currentBatchSize;
-		// }
 
 		MrcStackM init;
 		init.ReadFile(reference);
@@ -846,17 +862,10 @@ int ATOM(options &opt, int myid, int procs)
 		init.ReadBlock(start, start + length, 'z', vol.data);
 		init.Close();
 	}
-	else{
-		memset(vol.data,0,sizeof(float)*size);
+	else
+	{
+		memset(vol.data, 0, sizeof(float) * size);
 	}
-	// else
-	// {
-	// 	MrcStackM init;
-	// 	init.ReadFile(reference);
-	// 	init.ReadHeader();
-	// 	init.ReadBlock(start, start + length, 'y', vol.data);
-	// 	init.Close();
-	// }
 
 	size_t projsize = static_cast<size_t>(length) * static_cast<size_t>(projs.X()) * static_cast<size_t>(projs.Z());
 
@@ -897,7 +906,16 @@ int ATOM(options &opt, int myid, int procs)
 	{
 		SIRT(origin, projs, vol, &params[0], opt.iteration, opt.gamma, start, length, proj, opt.thickness);
 	}
-
+	else if (opt.method == "FBP")
+	{
+		ApplyFilterInplace(projs, proj.data, length, 0);
+		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
+	}
+	else if (opt.method == "WBP")
+	{
+		ApplyFilterInplace(projs, proj.data, length, 2);
+		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
+	}
 	// mrcvol.WriteBlock(vol.z, vol.z + height, 'z', vol.data);
 	// if (myid == 0)
 	mrcvol.WriteBlock(start, start + length, 'z', vol.data); // test-------------------------
