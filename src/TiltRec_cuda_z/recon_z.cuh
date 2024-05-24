@@ -9,7 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
-#include "../reconstruction_y/basic.cuh"
+#include "../TiltRec_cuda_y/basic.cuh"
 
 
 void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,

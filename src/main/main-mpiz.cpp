@@ -623,7 +623,416 @@ void SIRT(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 	delete[] reproj_wt.data;
 	delete[] projection.data;
 }
+void Reproject_admm_htb(const Point3DF &origin, const Volume &vol, const Coeff &coeff, float *htb, const Slice &slc)
+{
+	Point3D coord;
+	int n;
+	size_t volsize = vol.width * vol.length * vol.height;
+	for (int z = 0; z < vol.height; z++)
+	{
+		float *vdrefz = vol.data + z * (size_t)vol.width * vol.length;
+		float *htb_z = htb + z * (size_t)vol.width * vol.length; 
+		coord.z = z + vol.z;
 
+		for (int y = 0; y < vol.length; y++)
+		{
+			float *vdrefy = vdrefz + y * vol.width;
+			float *htb_y = htb_z + y * vol.width;
+			coord.y = y + vol.y;
+
+			for (int x = 0; x < vol.width; x++)
+			{
+				float *vdrefx = vdrefy + x;
+				float *htb_x = htb_y + x;
+				coord.x = x + vol.x;
+				Weight wt;
+				ValCoef(origin, coord, coeff, &wt);
+				
+				if (wt.x_min >= 0 && wt.x_min < slc.width && wt.y_min >= 0 &&
+					wt.y_min < slc.height)
+				{	//(x_min, y_min)
+					n = wt.x_min + wt.y_min * vol.width;							
+					*htb_x += (1 - wt.x_min_del) * (1 - wt.y_min_del) * slc.data[n]; 
+				}
+				if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < slc.width &&
+					wt.y_min >= 0 && wt.y_min < slc.height)
+				{											 //(x_min+1, y_min)
+					n = wt.x_min + 1 + wt.y_min * vol.width;
+					*htb_x += wt.x_min_del * (1 - wt.y_min_del) * slc.data[n];
+				}
+				if (wt.x_min >= 0 && wt.x_min < slc.width && (wt.y_min + 1) >= 0 &&
+					(wt.y_min + 1) < slc.height)
+				{											   //(x_min, y_min+1)
+					n = wt.x_min + (wt.y_min + 1) * vol.width;
+					*htb_x += (1 - wt.x_min_del) * wt.y_min_del * slc.data[n];
+				}
+				if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < slc.width &&
+					(wt.y_min + 1) >= 0 &&
+					(wt.y_min + 1) < slc.height)
+				{													 //(x_min+1, y_min+1)
+					n = (wt.x_min + 1) + (wt.y_min + 1) * vol.width;
+					*htb_x += wt.x_min_del * wt.y_min_del * slc.data[n];
+				}
+			}
+		}
+	}
+}
+void Reproject_admm_atax(const Point3DF &origin, const Volume &vol, float *x0, Coeff coeffv[],
+						 float *atax, int proj)
+{
+	Point3D coord;
+	int n;
+	size_t volsize = vol.width * vol.length * vol.height;
+	float *ax = (float *)malloc(sizeof(float) * vol.width * vol.length);
+	float *w = (float *)malloc(sizeof(float) * vol.width * vol.length);
+	int pxsize = vol.width * vol.length;
+	float a = 0;
+
+	for (int idx = 0; idx < proj; idx++)
+	{
+		memset(ax, 0, sizeof(float) * vol.width * vol.length); 
+		memset(w, 0, sizeof(float) * vol.width * vol.length); 
+		for (int z = 0; z < vol.height; z++)
+		{
+
+			float *vdrefz = x0 + z * (size_t)vol.width * vol.length;
+			coord.z = z + vol.z;
+
+			for (int y = 0; y < vol.length; y++)
+			{
+				float *vdrefy = vdrefz + y * vol.width;
+				coord.y = y + vol.y;
+
+				for (int x = 0; x < vol.width; x++)
+				{
+					float *vdrefx = vdrefy + x;
+					coord.x = x + vol.x;
+					Weight wt;
+					ValCoef(origin, coord, coeffv[idx], &wt);
+					if (wt.x_min >= 0 && wt.x_min < vol.width && wt.y_min >= 0 &&
+						wt.y_min < vol.length)
+					{										 //(x_min, y_min)
+						n = wt.x_min + wt.y_min * vol.width; 
+
+						ax[n] += (1 - wt.x_min_del) * (1 - wt.y_min_del) * (*vdrefx); 
+						w[n] += (1 - wt.x_min_del) * (1 - wt.y_min_del);
+					}
+					if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < vol.width &&
+						wt.y_min >= 0 && wt.y_min < vol.length)
+					{											 //(x_min+1, y_min)
+						n = wt.x_min + 1 + wt.y_min * vol.width; 
+						ax[n] += wt.x_min_del * (1 - wt.y_min_del) * (*vdrefx);
+						w[n] += wt.x_min_del * (1 - wt.y_min_del);
+					}
+					if (wt.x_min >= 0 && wt.x_min < vol.width && (wt.y_min + 1) >= 0 &&
+						(wt.y_min + 1) < vol.length)
+					{											   //(x_min, y_min+1)
+						n = wt.x_min + (wt.y_min + 1) * vol.width;
+
+						ax[n] += (1 - wt.x_min_del) * wt.y_min_del * (*vdrefx);
+						w[n] += (1 - wt.x_min_del) * wt.y_min_del;	
+					}
+					if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < vol.width &&
+						(wt.y_min + 1) >= 0 &&
+						(wt.y_min + 1) < vol.length)
+					{													 //(x_min+1, y_min+1)
+						n = (wt.x_min + 1) + (wt.y_min + 1) * vol.width; 
+						ax[n] += wt.x_min_del * wt.y_min_del * (*vdrefx);
+						w[n] += wt.x_min_del * wt.y_min_del;
+					}
+				}
+			}
+		}
+		MPI_Allreduce(MPI_IN_PLACE, ax, pxsize, MPI_FLOAT, MPI_SUM,
+					  MPI_COMM_WORLD);
+		MPI_Allreduce(MPI_IN_PLACE, w, pxsize, MPI_FLOAT, MPI_SUM,
+					  MPI_COMM_WORLD);
+
+
+		for (int z = 0; z < vol.height; z++)
+		{
+			float *atax_z = atax + z * (size_t)vol.width * vol.length;
+			coord.z = z + vol.z;
+
+			for (int y = 0; y < vol.length; y++)
+			{
+				float *atax_y = atax_z + y * vol.width;
+
+				coord.y = y + vol.y;
+
+				for (int x = 0; x < vol.width; x++)
+				{
+					float *atax_x = atax_y + x; 
+
+					coord.x = x + vol.x;
+					Weight wt;
+					ValCoef(origin, coord, coeffv[idx], &wt);
+
+					if (wt.x_min >= 0 && wt.x_min < vol.width && wt.y_min >= 0 &&
+						wt.y_min < vol.length)
+					{										 //(x_min, y_min)
+						n = wt.x_min + wt.y_min * vol.width;
+						if (fabs(w[n]) > 10e-6)
+						{ 
+							*atax_x += (1 - wt.x_min_del) * (1 - wt.y_min_del) * ax[n] / w[n];
+						}
+					} 
+					if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < vol.width &&
+						wt.y_min >= 0 && wt.y_min < vol.length)
+					{											 //(x_min+1, y_min)
+						n = wt.x_min + 1 + wt.y_min * vol.width; 
+						if (fabs(w[n]) > 10e-6)
+						{
+							*atax_x += wt.x_min_del * (1 - wt.y_min_del) * ax[n] / w[n];
+						}
+					}
+					if (wt.x_min >= 0 && wt.x_min < vol.width && (wt.y_min + 1) >= 0 &&
+						(wt.y_min + 1) < vol.length)
+					{											   //(x_min, y_min+1)
+						n = wt.x_min + (wt.y_min + 1) * vol.width;
+						if (fabs(w[n]) > 10e-6)
+						{ 
+							*atax_x += (1 - wt.x_min_del) * wt.y_min_del * ax[n] / w[n];
+						}
+					}
+					if ((wt.x_min + 1) >= 0 && (wt.x_min + 1) < vol.width &&
+						(wt.y_min + 1) >= 0 &&
+						(wt.y_min + 1) < vol.length)
+					{													 //(x_min+1, y_min+1)
+						n = (wt.x_min + 1) + (wt.y_min + 1) * vol.width; 
+						if (fabs(w[n]) > 10e-6)
+						{
+							*atax_x += wt.x_min_del * wt.y_min_del * ax[n] / w[n];
+						}
+					}
+				}
+			}
+		}
+	}
+	free(ax);
+	free(w);
+}
+void ATAmuLTL(float *vol, float *ata, float mu,
+			  int width, int length, int height)
+{
+	size_t n;
+
+	for (int z = 0; z < height; z++)
+	{
+		float *drez = vol + z * (size_t)width * length; 
+		float *drez_ATA = ata + z * (size_t)width * length;
+
+		for (int y = 0; y < length; y++)
+		{
+			float *drey = drez + y * width;
+			float *drey_ATA = drez_ATA + y * width;
+
+			for (int x = 0; x < width; x++)
+			{
+				float *drex = drey + x;
+				float *dreATA = drey_ATA + x;						
+				*dreATA += mu * (*drex);
+			}
+		}
+	}
+}
+void applycg(Volume &vol, float *atax0, float *ATb, int numberIteration, float mu, 
+             const Point3DF &origin, Coeff coeffv[], int proj, MrcStackM &projs)
+{
+	size_t volsize = vol.length * vol.width * vol.height;
+	float *r0, *p0;
+
+	if ((r0 = (float *)malloc(sizeof(float) * volsize)) == NULL)
+	{
+		printf("false2");
+	}
+	if ((p0 = (float *)malloc(sizeof(float) * volsize)) == NULL)
+	{
+		printf("false3");
+	}
+	float *ax = (float *)malloc(sizeof(float) * volsize);
+
+	double d1;
+	double d0;
+	double beta = 0;
+
+	for (int k = 0; k < volsize; k++)
+	{
+		r0[k] = ATb[k] - atax0[k];
+		p0[k] = r0[k];
+	}
+
+	float *h0;
+	if ((h0 = (float *)malloc(sizeof(float) * volsize)) == NULL)
+	{
+		printf("false1");
+	}
+
+	for (int i = 0; i < numberIteration; i++)
+	{
+		memset(h0, 0, sizeof(float) * volsize);
+		{
+			Reproject_admm_atax(origin, vol, p0, coeffv, h0, proj);	  
+			ATAmuLTL(p0, h0, mu, vol.width, vol.length, vol.height);
+		}
+
+		double alpha = 0;
+		double d2 = 0;
+		d1 = 0;
+		d0 = 0;
+		for (int k = 0; k < volsize; k++)
+		{
+			d0 += r0[k] * r0[k];
+			d2 += h0[k] * p0[k]; 
+		}
+		MPI_Allreduce(MPI_IN_PLACE, &d0, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		MPI_Allreduce(MPI_IN_PLACE, &d2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		if (d2 > 10e-6 || -d2 > 10e-6) 
+		{
+			alpha = d0 / d2;
+		}
+		else
+		{
+			alpha = 0;
+		}
+
+		for (int k = 0; k < volsize; k++)
+		{
+			vol.data[k] = vol.data[k] + alpha * p0[k]; 
+		}
+
+		{
+			Reproject_admm_atax(origin, vol, vol.data, coeffv, ax, proj);
+			ATAmuLTL(vol.data, ax, mu, vol.width, vol.length, vol.height);
+		}
+
+		for (int k = 0; k < volsize; k++)
+		{
+			r0[k] = ATb[k] - ax[k];  
+			d1 += r0[k] * h0[k];
+		}
+		MPI_Allreduce(MPI_IN_PLACE, &d1, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+		if (d2 > 10e-6 || -d2 > 10e-6)
+		{
+			beta = d1 / d2;
+		}
+		else
+		{
+			beta = 0;
+		}
+
+		for (int k = 0; k < volsize; k++)
+		{	
+			p0[k] = r0[k] + beta * p0[k]; 	
+		}
+	}
+	free(h0);
+	free(r0);
+	free(p0);
+	free(ax);
+}
+
+void ATbmuLT(float *atb, float *uk, float *dk, int width, int length, int height, float mu)
+{
+	size_t volsize = width * length * height;
+	for (int z = 0; z < height; z++)
+	{
+		float *drez_atb = atb + z * (size_t)width * length;
+		float *drez_u = uk + z * (size_t)width * length;
+		float *drez_d = dk + z * (size_t)width * length;
+
+		for (int y = 0; y < length; y++)
+		{
+			float *drey_atb = drez_atb + y * width;
+			float *drey_u = drez_u + y * width;
+			float *drey_d = drez_d + y * width;
+
+			for (int x = 0; x < width; x++)
+			{
+				float *drex_atb = drey_atb + x;
+				float *drex_u = drey_u + x;
+				float *drex_d = drey_d + x;
+				
+				*drex_atb += ((*drex_u) - (*drex_d)) * mu;
+			}
+		}
+	}
+}
+
+void soft_admm(float *u_k, float *d_k, float soft, size_t volsize)
+{
+	for (size_t k = 0; k < volsize; k++)
+	{
+		float u; 
+		if (u_k[k] + d_k[k] < -soft)
+		{
+			u = u_k[k] + d_k[k] + soft;
+			d_k[k] = d_k[k] + u_k[k] - u;
+			u_k[k] = u;
+		}
+		else if (u_k[k] + d_k[k] > soft)
+		{
+			u = u_k[k] + d_k[k] - soft;
+			d_k[k] = d_k[k] + u_k[k] - u;
+			u_k[k] = u;
+		}
+		else
+		{
+			u = 0;
+			d_k[k] = d_k[k] + u_k[k] - u;
+			u_k[k] = u;
+		}
+	}
+}
+void ADMM(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[], 
+		  int maxOutIter, int numberIteration, float mu, float soft)
+{
+	int pxsize = projs.X() * projs.Y(); 
+	size_t volsize = vol.length * vol.width * vol.height; 
+
+	Slice proj(projs.X(), projs.Y()); 
+	Point3D coord; 
+
+
+	float *htb = (float *)malloc(sizeof(float) * volsize); 
+
+	memset(htb, 0, sizeof(float) * volsize); 
+
+	for (int idx = 0; idx < projs.Z(); idx++) 
+	{
+		projs.ReadSliceZ(idx, proj.data); 
+		Reproject_admm_htb(origin, vol, coeffv[idx], htb, proj);
+	}
+
+	float *u_k = (float *)malloc(sizeof(float) * volsize);
+	float *d_k = (float *)malloc(sizeof(float) * volsize);
+	memset(u_k, 0, sizeof(float) * volsize);
+	memset(d_k, 0, sizeof(float) * volsize);
+
+	for (int i = 0; i < maxOutIter; i++)
+	{
+		printf("**  ADMM iter:%d  **\n", i);
+		float *x0 = (float *)malloc(sizeof(float) * volsize);
+		memset(x0, 0, sizeof(float) * volsize);
+	
+		ATbmuLT(htb, u_k, d_k, vol.width, vol.length, vol.height, mu);
+
+		{
+			Reproject_admm_atax(origin, vol, vol.data, coeffv, x0, projs.Z()); 
+			ATAmuLTL(vol.data, x0, mu, vol.width, vol.length, vol.height); 
+		}
+
+		applycg(vol, x0, htb, numberIteration, mu, origin, coeffv, projs.Z(), projs); 
+		free(x0);
+		soft_admm(u_k, d_k, soft, volsize);
+	}
+
+
+	free(u_k);
+	free(d_k);
+	free(htb);
+}
 struct SysInfo
 {
 	int id;
@@ -759,6 +1168,10 @@ int ATOM(options &opt, int myid, int procs)
 	{
 		printf("Start using WBP for reconstruction.\n  ");
 		FBP(origin, projs, vol, &params[0], 2);
+	}
+	else if (opt.method == "ADMM")
+	{
+		ADMM(origin, projs, vol, &params[0], opt.iteration, opt.cgiter, opt.gamma, opt.soft);
 	}
 
 	// TestMrcWriteToFile(mrcvol, opt.output);

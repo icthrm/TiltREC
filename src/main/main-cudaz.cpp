@@ -1,8 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include "../reconstruction_y/recon_y.cuh"
-#include "../reconstruction_z/recon_z.cuh"
+#include "..//TiltRec_cuda_y/recon_y.cuh"
+#include "../TiltRec_cuda_z/recon_z.cuh"
 #include "../opts/opts.h"
 #include <sstream>
 #include <cassert>

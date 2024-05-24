@@ -30,6 +30,9 @@ struct options
 	// params for iteration
 	int iteration;
 	float gamma;
+	int cgiter;
+
+	float soft;
 };
 
 inline void UsageDual()
@@ -66,6 +69,8 @@ inline void UsageDual()
 			  << std::endl;
 	std::cout << "    SIRT: SIRT,iteration_number,relax_paramete \n"
 			  << std::endl;
+	std::cout << "    ADMM: ADMM,iteration_number,cgiter,relax_paramete,soft \n"
+			  << std::endl;
 	std::cout << "-help(-h)" << std::endl;
 	std::cout << "    Help Information\n"
 			  << std::endl;
@@ -86,6 +91,8 @@ inline void PrintOpts(const options &opt)
 	std::cout << "initial = " << opt.initial << std::endl;
 	std::cout << "method = " << opt.method << std::endl;
 	std::cout << "iter = " << opt.iteration << std::endl;
+	std::cout << "cgiter = " << opt.cgiter << std::endl;
+	std::cout << "soft = " << opt.soft << std::endl;
 	std::cout << "step = " << opt.gamma << std::endl;
 }
 
@@ -95,6 +102,8 @@ inline void InitOpts(options *opt)
 	opt->zshift = 0;
 	opt->thickness = 0;
 	opt->offset = 0;
+	opt->cgiter = 1;
+	opt->soft = 0;
 	opt->input[0] = '\0';
 	opt->output[0] = '\0';
 	opt->initial[0] = '\0';
@@ -225,6 +234,17 @@ inline int GetOpts(int argc, char **argv, options *opts_)
 					opts_->iteration = atoi(tmp.c_str());
 					getline(iss, tmp);
 					opts_->gamma = atof(tmp.c_str());
+				}
+				else if (opts_->method == "ADMM")
+				{
+					getline(iss, tmp, ',');
+					opts_->iteration = atoi(tmp.c_str());
+					getline(iss, tmp, ',');
+					opts_->cgiter = atof(tmp.c_str());
+					getline(iss, tmp, ',');
+					opts_->gamma = atof(tmp.c_str());
+					getline(iss, tmp);
+					opts_->soft = atof(tmp.c_str());
 				}
 				else
 				{

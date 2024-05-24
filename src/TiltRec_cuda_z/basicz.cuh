@@ -2,8 +2,7 @@
 #define BASIC_HZ__
 
 #include "mrcmx/mrcstack.h"
-
-#include "../reconstruction_y/basic.cuh"
+#include "../TiltRec_cuda_y/basic.cuh"
 #define DATATYPE
 
 #define CUERR                                                                                \
