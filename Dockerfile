@@ -1,14 +1,18 @@
 FROM centos:7
 
-# 安装编译工具和相关依赖
+# 更新系统并安装开发工具
 RUN yum -y update && \
     yum -y groupinstall "Development Tools" && \
-    yum -y install epel-release && \
-    yum -y install git wget which cmake3 && \
-    yum -y install libjpeg-turbo-devel libpng-devel libtiff-devel && \
-    yum -y install gtk2-devel && \
-    yum -y install libdc1394-devel libv4l-devel gstreamer-plugins-base-devel && \
-    yum -y clean all
+    yum -y install epel-release
+
+# 安装其他依赖项
+RUN yum -y install git wget which cmake3
+RUN yum -y install libjpeg-turbo-devel libpng-devel libtiff-devel
+RUN yum -y install gtk2-devel
+RUN yum -y install libdc1394-devel libv4l-devel gstreamer-plugins-base-devel
+
+# 清理缓存
+RUN yum -y clean all
 
 # 创建软链接以使用 cmake
 RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
@@ -20,7 +24,7 @@ ENV PATH="/usr/local/bin:${PATH}"
 RUN wget https://www.mpich.org/static/downloads/3.3.2/mpich-3.3.2.tar.gz && \
     tar -xzf mpich-3.3.2.tar.gz && \
     cd mpich-3.3.2 && \
-    ./configure --prefix=/usr/local && \
+    ./configure --prefix=/usr/local --includedir=/usr/local/mpi/include && \
     make && make install && \
     cd .. && rm -rf mpich-3.3.2.tar.gz mpich-3.3.2
 
@@ -53,9 +57,9 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/11.1.1/local_install
     yum install -y cuda
 
 # 设置工作目录
-WORKDIR /home/xushuwei_gpu/cryoet/
-COPY cryoet_cuda/ /home/xushuwei_gpu/cryoet/cryoet_cuda/
-COPY data/ /home/xushuwei_gpu/cryoet/data/
+WORKDIR /home/TiltRec
+COPY ./ /home/TiltRec
+
 
 # 设置默认命令
 CMD ["bash"]

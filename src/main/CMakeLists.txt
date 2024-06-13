@@ -23,7 +23,7 @@ include(FindCUDA/select_compute_arch)
 CUDA_SELECT_NVCC_ARCH_FLAGS(NVCC_FLAGS_EXTRA ${CUDA_ARCH_LIST})
 list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 cuda_add_executable(TiltRec-cuda main-cuda.cpp)
 cuda_add_executable(TiltRecZ-cuda main-cudaz.cpp)
