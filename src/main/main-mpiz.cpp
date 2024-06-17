@@ -812,6 +812,33 @@ void Reproject_admm_atax(const Point3DF &origin, const Volume &vol, float *x0, C
 	free(ax);
 	free(w);
 }
+
+void ATbmuLT(float *atb, float *uk, float *dk, int width, int length, int height, float mu)
+{
+	size_t volsize = width * length * height;
+	for (int z = 0; z < height; z++)
+	{
+		float *drez_atb = atb + z * (size_t)width * length;
+		float *drez_u = uk + z * (size_t)width * length;
+		float *drez_d = dk + z * (size_t)width * length;
+
+		for (int y = 0; y < length; y++)
+		{
+			float *drey_atb = drez_atb + y * width;
+			float *drey_u = drez_u + y * width;
+			float *drey_d = drez_d + y * width;
+
+			for (int x = 0; x < width; x++)
+			{
+				float *drex_atb = drey_atb + x;
+				float *drex_u = drey_u + x;
+				float *drex_d = drey_d + x;
+				
+				*drex_atb += ((*drex_u) - (*drex_d)) * mu;
+			}
+		}
+	}
+}
 void ATAmuLTL(float *vol, float *ata, float mu,
 			  int width, int length, int height)
 {
@@ -933,55 +960,21 @@ void applycg(Volume &vol, float *atax0, float *ATb, int numberIteration, float m
 	free(ax);
 }
 
-void ATbmuLT(float *atb, float *uk, float *dk, int width, int length, int height, float mu)
-{
-	size_t volsize = width * length * height;
-	for (int z = 0; z < height; z++)
-	{
-		float *drez_atb = atb + z * (size_t)width * length;
-		float *drez_u = uk + z * (size_t)width * length;
-		float *drez_d = dk + z * (size_t)width * length;
-
-		for (int y = 0; y < length; y++)
-		{
-			float *drey_atb = drez_atb + y * width;
-			float *drey_u = drez_u + y * width;
-			float *drey_d = drez_d + y * width;
-
-			for (int x = 0; x < width; x++)
-			{
-				float *drex_atb = drey_atb + x;
-				float *drex_u = drey_u + x;
-				float *drex_d = drey_d + x;
-				
-				*drex_atb += ((*drex_u) - (*drex_d)) * mu;
-			}
-		}
-	}
-}
-
-void soft_admm(float *u_k, float *d_k, float soft, size_t volsize)
+void soft_admm(float *u_k, float *d_k, float *voldata, float soft, size_t volsize)
 {
 	for (size_t k = 0; k < volsize; k++)
 	{
-		float u; 
-		if (u_k[k] + d_k[k] < -soft)
+		if (voldata[k] + d_k[k] < -soft)
 		{
-			u = u_k[k] + d_k[k] + soft;
-			d_k[k] = d_k[k] + u_k[k] - u;
-			u_k[k] = u;
+			u_k[k] = voldata[k] + d_k[k] + soft;
 		}
-		else if (u_k[k] + d_k[k] > soft)
+		else if (voldata[k] + d_k[k] > soft)
 		{
-			u = u_k[k] + d_k[k] - soft;
-			d_k[k] = d_k[k] + u_k[k] - u;
-			u_k[k] = u;
+			u_k[k] = voldata[k] + d_k[k] - soft;
 		}
 		else
 		{
-			u = 0;
-			d_k[k] = d_k[k] + u_k[k] - u;
-			u_k[k] = u;
+			u_k[k] = 0;
 		}
 	}
 }
@@ -1025,9 +1018,17 @@ void ADMM(const Point3DF &origin, MrcStackM &projs, Volume &vol, Coeff coeffv[],
 
 		applycg(vol, x0, htb, numberIteration, mu, origin, coeffv, projs.Z(), projs); 
 		free(x0);
-		soft_admm(u_k, d_k, soft, volsize);
-	}
 
+		//update uk
+		soft_admm(u_k, d_k, vol.data, soft, volsize);
+		
+		//update dk
+		for (size_t k = 0; k < volsize; k++)
+		{
+			d_k[k] += vol.data[k] - u_k[k];
+		}
+		
+	}
 
 	free(u_k);
 	free(d_k);

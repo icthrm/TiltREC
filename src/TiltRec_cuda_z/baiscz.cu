@@ -376,7 +376,7 @@ __global__ void CuAtA_ADMM1_Z(Point3DF *origin, SimCoeff *coeffs, float *ax, flo
 	coord.z = coordz_offset + blockIdx.y; 
 	coord.y = xyId / cudev_x;					 
 	coord.x = xyId - coord.y * cudev_x;		 
-	int angidx = angIdxStart + blockIdx.z; 
+	int angidx = angIdxStart; 
 
 	Weight wt;
 	CuValCoefZ(*origin, coord, coeffs[angidx], &wt);
@@ -412,7 +412,7 @@ __global__ void CuAtA_ADMM1_Z(Point3DF *origin, SimCoeff *coeffs, float *ax, flo
 		n = (wt.x_min + 1) + (wt.y_min + 1) * cudev_x; 
 		w = wt.x_min_del * wt.y_min_del;
 		atomicAdd(&ax[n], w * voldata[volid]);
-		atomicAdd(&weight[n], w * wt.y_min_del);
+		atomicAdd(&weight[n], w);
 	}
 }
 
@@ -430,7 +430,7 @@ __global__ void CuAtA_ADMM2_Z(Point3DF *origin, SimCoeff *coeffs, float *ax, flo
 	coord.z = coordz_offset + blockIdx.y; 
 	coord.y = xyId / cudev_x;					 
 	coord.x = xyId - coord.y * cudev_x;		 
-	int angidx = angIdxStart + blockIdx.z; 
+	int angidx = angIdxStart; 
 
 	Weight wt;
 	CuValCoefZ(*origin, coord, coeffs[angidx], &wt);
@@ -496,16 +496,22 @@ __global__ void CuAtA_ADMM3_Z(float *x_0, float *vol_data, float gamma, int vols
 
 void CuATaGammaI_ADMM_Z(Point3DF *origin, SimCoeff *coeffs, float *a_x, float *w, float *x0, int cudev_x, 
                       int cudev_y, int volsize, float *voldata, float gamma, dim3 dim_1grid, dim3 dim_3grid, 
-					  dim3 dim_block, int coordz_offset, int angIdxStart)
+					  dim3 dim_block, int coordz_offset, int projsnum)
 {
-	cudaMemset(a_x, 0, sizeof(float) * cudev_x * cudev_y);
-	cudaMemset(w, 0, sizeof(float) * cudev_x * cudev_y);
-	CuAtA_ADMM1_Z<<<dim_3grid, dim_block>>>(origin, coeffs, a_x, w, voldata, cudev_x, 
-	                                        cudev_y, coordz_offset, angIdxStart); 
-	cudaDeviceSynchronize();
-	CuAtA_ADMM2_Z<<<dim_3grid, dim_block>>>(origin, coeffs, a_x, w, x0, cudev_x, 
-	                                        cudev_y, coordz_offset, angIdxStart);
-	cudaDeviceSynchronize();
+	for (int projIdxStart = 0; projIdxStart < projsnum; projIdxStart++)
+	{
+		cudaMemset(a_x, 0, sizeof(float) * cudev_x * cudev_y);
+		cudaMemset(w, 0, sizeof(float) * cudev_x * cudev_y);
+
+		CuAtA_ADMM1_Z<<<dim_3grid, dim_block>>>(origin, coeffs, a_x, w, voldata, cudev_x, 
+	                                        cudev_y, coordz_offset, projIdxStart); 
+		cudaDeviceSynchronize();
+		
+		CuAtA_ADMM2_Z<<<dim_3grid, dim_block>>>(origin, coeffs, a_x, w, x0, cudev_x, 
+	                                        cudev_y, coordz_offset, projIdxStart);
+		cudaDeviceSynchronize();
+	}
+
 	CuAtA_ADMM3_Z<<<dim_1grid, dim_block>>>(x0, voldata, gamma, volsize); 
 	cudaDeviceSynchronize();
 }
@@ -599,7 +605,7 @@ __global__ void CuCG_p_(float beta, float *p_0, float *r_0, int volsize)
 }
 
 void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *htb, int numberIteration, 
-                    float gamma, size_t volsize, dim3 dim_1grid, dim3 dim_3grid, dim3 dim_block)
+                    float gamma, size_t volsize, dim3 dim_1grid, dim3 dim_3grid, dim3 dim_block, int projsnum)
 {
 	float *r0, *p0, *Ax, *h0;
 	cudaMallocManaged((void **)&r0, sizeof(float) * volsize);
@@ -632,8 +638,8 @@ void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *h
 	{
 		cudaMemset(h0, 0, sizeof(float) * volsize);
 		CuATaGammaI_ADMM_Z(cudevice.origin, cudevice.coeffs, cudevice.s, cudevice.c, h0, cudevice.x, cudevice.y, 
-                           volsize, p0, gamma, dim_1grid, dim_3grid, dim_block, 0, 0);
-		float alpha = 0;
+                           volsize, p0, gamma, dim_1grid, dim_3grid, dim_block, 0, projsnum);
+		float alpha = 0;		
 
 		cudaMemset(d0, 0, sizeof(float));
 		cudaMemset(d1, 0, sizeof(float));
@@ -648,6 +654,7 @@ void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *h
 		cudaDeviceSynchronize();
 		cudaMemcpy(&d2_value, d2, sizeof(float), cudaMemcpyDeviceToHost);
 		CUERR
+
 		if (fabs(d2_value)> 10e-6)
 		{
 			alpha = d0_value / d2_value; 
@@ -656,11 +663,12 @@ void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *h
 		{
 			alpha = 0;
 		}
+
 		CuCG_voldata<<<dim_1grid, dim_block>>>(voldata, p0, alpha, volsize); 
 		cudaDeviceSynchronize();
 
 		CuATaGammaI_ADMM_Z(cudevice.origin, cudevice.coeffs, cudevice.s, cudevice.c, Ax, cudevice.x, cudevice.y, 
-                           volsize, voldata, gamma, dim_1grid, dim_3grid, dim_block, 0, 0);
+                           volsize, voldata, gamma, dim_1grid, dim_3grid, dim_block, 0, projsnum);
 		cudaDeviceSynchronize();
 		CuCG_r_<<<dim_1grid, dim_block>>>(r0, Ax, htb, volsize);
 		cudaDeviceSynchronize();
@@ -690,7 +698,8 @@ void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *h
 	cudaFree(d2);
 }
 
-__global__ void CuSoft_ADMM_Z(float *u_k, float *d_k, float soft, int cudev_x, int volsize)
+
+__global__ void CuSoft_ADMM_Z(float *u_k, float *d_k, float *voldata, float soft, int volsize)
 {
 	size_t xyId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (xyId >= volsize)
@@ -700,24 +709,28 @@ __global__ void CuSoft_ADMM_Z(float *u_k, float *d_k, float soft, int cudev_x, i
 
 	size_t validx = xyId;
 
-	float u;
-	if (u_k[validx] + d_k[validx] < -soft)
+	if (voldata[validx] + d_k[validx] < -soft)
 	{
-		u = u_k[validx] + d_k[validx] + soft;
-		d_k[validx] = d_k[validx] + u_k[validx] - u;
-		u_k[validx] = u;
+		u_k[validx] = voldata[validx] + d_k[validx] + soft;
 	}
-	else if (u_k[validx] + d_k[validx] > soft)
+	else if (voldata[validx] + d_k[validx] > soft)
 	{
-		u = u_k[validx] + d_k[validx] - soft;
-		d_k[validx] = d_k[validx] + u_k[validx] - u;
-		u_k[validx] = u;
+		u_k[validx] = voldata[validx] + d_k[validx] - soft;
 	}
 	else
 	{
-		u = 0;
-		d_k[validx] = d_k[validx] + u_k[validx] - u;
-		u_k[validx] = u;
+		u_k[validx] = 0;
 	}
 }
 
+__global__ void Cu_dk_ADMM_Z(float *d_k, float *u_k, float *voldata, int volsize)
+{
+	size_t xyId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (xyId >= volsize)
+	{
+		return;
+	}
+
+	size_t validx = xyId;
+	d_k[validx] += voldata[validx] - u_k[validx];
+}

@@ -90,8 +90,9 @@ void CuATaGammaI_ADMM_Z(Point3DF *origin, SimCoeff *coeffs, float *a_x, float *w
 					  dim3 dim_block, int coordz_offset, int angIdxStart);
 
 void CuApplycg_ADMM_Z(CuTaskDataZ &cudevice, float *voldata, float *x0, float *htb, int numberIteration, 
-                    float gamma, size_t volsize, dim3 dim_1grid, dim3 dim_3grid, dim3 dim_block);
+                    float gamma, size_t volsize, dim3 dim_1grid, dim3 dim_3grid, dim3 dim_block, int projsnum);
 
-__global__ void CuSoft_ADMM_Z(float *u_k, float *d_k, float soft, int cudev_x, int volsize);
+__global__ void CuSoft_ADMM_Z(float *u_k, float *d_k, float *voldata, float soft, int volsize);
+__global__ void Cu_dk_ADMM_Z(float *d_k, float *u_k, float *voldata, int volsize);
 
 #endif

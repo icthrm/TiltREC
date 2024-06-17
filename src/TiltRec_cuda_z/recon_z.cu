@@ -347,48 +347,62 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     // cudaEventCreate(&stop);
     // cudaEventRecord(begin);
 
-    float *htb, *x0, *uk, *dk;
+    float *htb, *uk, *dk;
     cudaMallocManaged((void **)&htb, sizeof(float) * volsize);
-    CUERR
-    cudaMallocManaged((void **)&x0, sizeof(float) * volsize);
     CUERR
     cudaMallocManaged((void **)&uk, sizeof(float) * volsize);
     CUERR
     cudaMallocManaged((void **)&dk, sizeof(float) * volsize);
     CUERR
-
+    
+    cudaMemset(htb, 0, sizeof(float) * volsize);
     cudaMemset(uk, 0, sizeof(float) * volsize);
     cudaMemset(dk, 0, sizeof(float) * volsize);
 
+   for (int projIdxStart = 0; projIdxStart < projsnum; projIdxStart += batchsize) 
+    {
+        float *curProjData = proj.data + projIdxStart * projs.X() * projs.Y();
+        cudaDeviceSynchronize();
+
+        CuAtb_ADMM_Z<<<dim3Grid, dimBlock>>>(cudev.origin, cudev.coeffs, htb, cudev.x, cudev.y, 
+                                            curProjData, 0, projIdxStart);
+        cudaDeviceSynchronize();
+        CUERR
+    }
+
     for (int iter = 0; iter < iteration; ++iter)
     {
-        cudaMemset(htb, 0, sizeof(float) * volsize);
+        float *x0;
+        cudaMallocManaged((void **)&x0, sizeof(float) * volsize);
+        CUERR
         cudaMemset(x0, 0, sizeof(float) * volsize);
 
-        for (int projIdxStart = 0; projIdxStart < projsnum; projIdxStart += batchsize)
-        {
-            float *curProjData = proj.data + projIdxStart * projs.X() * projs.Y();
-            cudaDeviceSynchronize();
-            printf("ADMM Iter %d on projs [%d,%d)\n", iter, projIdxStart, projIdxStart + batchsize);
-
-            CuAtb_ADMM_Z<<<dim3Grid, dimBlock>>>(cudev.origin, cudev.coeffs, htb, cudev.x, cudev.y,
-                                                 curProjData, 0, projIdxStart);
-            cudaDeviceSynchronize();
-            CUERR
-            CuATbGammaIt_ADMM_Z<<<dim1Grid, dimBlock>>>(htb, uk, dk, volsize, gamma);
-            cudaDeviceSynchronize();
-            CUERR
-            CuATaGammaI_ADMM_Z(cudev.origin, cudev.coeffs, cudev.s, cudev.c, x0, cudev.x, cudev.y,
-                               volsize, vol.data, gamma, dim1Grid, dim3Grid, dimBlock, 0, projIdxStart);
-            CUERR
-            cudaDeviceSynchronize();
-        }
-
-        CuApplycg_ADMM_Z(cudev, vol.data, x0, htb, cgiter, gamma, volsize, dim1Grid, dim3Grid_xyz, dimBlock);
+        printf("ADMM Iter %d \n", iter);                               
+            
+        CuATbGammaIt_ADMM_Z<<<dim1Grid, dimBlock>>>(htb, uk, dk, volsize, gamma);
+        cudaDeviceSynchronize();
         CUERR
-        CuSoft_ADMM_Z<<<dim1Grid, dimBlock>>>(uk, dk, soft, cudev.x, volsize);
+
+        CuATaGammaI_ADMM_Z(cudev.origin, cudev.coeffs, cudev.s, cudev.c, x0, cudev.x, cudev.y, 
+                               volsize, vol.data, gamma, dim1Grid, dim3Grid, dimBlock, 0, projsnum); 
         CUERR
         cudaDeviceSynchronize();
+        CUERR
+
+        CuApplycg_ADMM_Z(cudev, vol.data, x0, htb, cgiter, gamma, volsize, dim1Grid, dim3Grid, dimBlock, projsnum);
+        CUERR
+        cudaFree(x0);
+
+        //update uk
+        CuSoft_ADMM_Z<<<dim1Grid, dimBlock>>>(uk, dk, vol.data, soft, volsize);
+        CUERR
+        cudaDeviceSynchronize();
+
+        //update dk
+        Cu_dk_ADMM_Z<<<dim1Grid, dimBlock>>>(dk, uk, vol.data, volsize);
+        CUERR
+        cudaDeviceSynchronize();
+
         CUERR
     }
     cudaDeviceSynchronize();
@@ -412,7 +426,6 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
     cudaFree(htb);
-    cudaFree(x0);
     cudaFree(uk);
     cudaFree(dk);
     cudaFree(proj.data);
