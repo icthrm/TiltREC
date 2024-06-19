@@ -163,6 +163,10 @@ void ExeRecY(options &opt, Point3DF &origin, MrcStackM &projs, std::vector<SimCo
     ApplyFilterInplace(projs, proj.data, length, 2);
     CuFBP(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2, opt.pitch_angle, start, length, add_left);
   }
+  else if (opt.method == "ADMM")
+  {
+    printf("TiltRec-cuda does not provide the ADMM method. Please use TiltRecZ-cuda or TiltRecZ-mpi.\n  ");
+  }
 }
 int ATOM_GPU(options &opt, int myid, int procs)
 {

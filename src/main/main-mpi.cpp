@@ -834,8 +834,12 @@ int ATOM(options &opt, int myid, int procs)
 		ApplyFilterInplace(projs, proj.data, length, 2);
 		BackProject(origin, projs, vol, &params[0], start, length, proj, opt.thickness);
 	}
+	else if (opt.method == "ADMM")
+	{
+		printf("TiltRec-mpi does not provide the ADMM method. Please use TiltRecZ-cuda or TiltRecZ-mpi.\n  ");
+	}
 
-	mrcvol.WriteBlock(start, start + length, 'z', vol.data); 
+	mrcvol.WriteBlock(start, start + length, 'z', vol.data);
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (myid == 0)
