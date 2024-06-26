@@ -101,7 +101,7 @@ void InitBodyInfo(Bodyinfo &volinfo, float pitch_angle, MrcStackM &projs, int th
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.steplength = 64;
-  volinfo.steplength = max(64, gridYMax);
+  //volinfo.steplength = max(64, gridYMax);
   volinfo.steplength = min(volinfo.steplength, static_cast<float>(length));
   volinfo.slice_steplength = volinfo.Y_add_left + volinfo.steplength + volinfo.Y_add_right;
   volinfo.volsize = (size_t)projs.X() * thickness * volinfo.slice_steplength;
