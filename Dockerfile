@@ -56,10 +56,6 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/11.1.1/local_install
     yum clean all && \
     yum install -y cuda
 
-# 设置工作目录
-WORKDIR /home/TiltRec
-COPY ./ /home/TiltRec
-
 
 # 设置默认命令
 CMD ["bash"]
