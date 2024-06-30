@@ -273,7 +273,7 @@ void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     {
       size_t sliceOffset = z * projs.X() * length + (y - start + add_left - volinfo.Y_add_left) * projs.X();
       float *hostPtr = proj.data + sliceOffset;
-      float *devicePtr = cudev.projs + (int)(z * volinfo.slice_steplength * projs.X());
+      float *devicePtr = cudev.projs + static_cast<size_t>(z * volinfo.slice_steplength * projs.X());
       CHECK_CUDA(cudaMemcpy(devicePtr, hostPtr, sizeof(float) * volinfo.slice_steplength * projs.X(), cudaMemcpyHostToDevice))
     }
 

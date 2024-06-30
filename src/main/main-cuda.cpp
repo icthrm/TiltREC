@@ -256,13 +256,13 @@ int ATOM_GPU(options &opt, int myid, int procs)
   InitializeCuda(myid);
 
   length = length + add_left + add_right;
-
-  CHECK_CUDA(cudaHostAlloc((void **)(&proj.data), sizeof(float) * projs.X() * length * projs.Z(), cudaHostAllocDefault))
+  size_t prosize=projs.X() * length * projs.Z();
+  CHECK_CUDA(cudaHostAlloc((void **)(&proj.data), static_cast<size_t>(sizeof(float) *prosize), cudaHostAllocDefault))
 
   float *tmp = nullptr;
   try
   {
-    tmp = new float[projs.Z() * projs.X() * length];
+    tmp = new float[prosize];
   }
   catch (const std::bad_alloc &e)
   {
@@ -274,14 +274,12 @@ int ATOM_GPU(options &opt, int myid, int procs)
 
   if (myid == 0)
   {
-
     ExeRecY(opt, origin, projs, params, mrcvol, proj, vol, start, length, add_left);
   }
 
   float *nextData = nullptr;
   for (int block = 1; block < procs; ++block)
   {
-
     if (myid == 0)
     {
       int nextLength, nextStart, nextAddLeft, nextheight;
