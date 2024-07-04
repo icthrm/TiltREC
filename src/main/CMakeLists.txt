@@ -1,17 +1,11 @@
 FILE(GLOB SOURCES "*.cu" "*.cpp" "*.c")
 
-if(ENABLE_OMP)
-       find_package(OpenMP REQUIRED)
-       set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
-       set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_C_FLAGS}")
-endif(ENABLE_OMP)
 
 find_package(CUDA QUIET REQUIRED)
 find_package(MPI REQUIRED)
 find_package(OpenCV REQUIRED)
 
 include_directories(SYSTEM ${PROJECT_SOURCE_DIR} ${MPI_INCLUDE_PATH})
-#include_directories(/usr/local/cuda-11.1/targets/x86_64-linux/include)
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3)
 
