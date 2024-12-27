@@ -2,11 +2,11 @@
 extern cudaDeviceProp deviceProps;
 
 void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
-                    std::vector<SimCoeff> &params, int thickness,
+                    std::vector<SimCoeff> &params,
                     MrcStackM &mrcvol, Slice &proj,
-                    Volume &vol)
+                    Volume &vol, const options &opt)
 {
-
+    int thickness = opt.thickness;
     size_t maxThreadsSize = deviceProps.maxThreadsPerBlock;
 
     int steplength = thickness;
@@ -43,10 +43,6 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
             cudev.z = steplength;
         }
 
-        // time_t now = time(NULL);
-        // char *curr_time = ctime(&now);
-        // std::cout << curr_time << std::endl;
-
         cudaDeviceSynchronize();
         CUERR
         dim3 dimBlock = maxThreadsSize;
@@ -58,28 +54,42 @@ void CuBackProjectZ(Point3DF &origin, MrcStackM &projs,
         CUERR
         cudaDeviceSynchronize();
         CUERR
+              if (opt.f2b)
+        {
+            thrust::device_ptr<float> dev_ptr(vol.data);
+            float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volsize) / volsize;
+            float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volsize, [chunk_mean] __device__(float x)
+                                                       { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+            chunk_std = sqrt(chunk_std / volsize);
 
+            CufloatToByteKernel<<<(volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(vol.data, chunk_mean, chunk_std, 10, volsize);
+            int j = 0;
+            for (j = 0; j + 20 < thickness; j += 20)
+                mrcvol.WriteBlock<unsigned char>(j, j + 20, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+            mrcvol.WriteBlock<unsigned char>(j, thickness, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+        }
+        else
         {
             int j = 0;
             for (j = 0; j + 20 < thickness; j += 20)
-                mrcvol.WriteBlock(j, j + 20, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
-            mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+                mrcvol.WriteBlock<float>(j, j + 20, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+            mrcvol.WriteBlock<float>(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
         }
     }
-    // time_t now = time(NULL);
-    // char *curr_time = ctime(&now);
-    // std::cout << curr_time << std::endl;
+
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
     cudaFree(originalProjsData);
 }
 
 void CuSIRTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-             int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-             int iteration,
-             float gamma)
+             MrcStackM &mrcvol, Slice &proj, Volume &vol,
+             const options &opt)
 {
 
+     int thickness = opt.thickness;
+    int iteration = opt.iteration;
+    float gamma = opt.gamma;
     size_t maxThreadsSize = deviceProps.maxThreadsPerBlock;
 
     int batchsize = 1;
@@ -151,12 +161,26 @@ void CuSIRTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     }
     cudaDeviceSynchronize();
     CUERR
+        if (opt.f2b)
+    {
+        thrust::device_ptr<float> dev_ptr(vol.data);
+        float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volsize) / volsize;
+        float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volsize, [chunk_mean] __device__(float x)
+                                                   { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+        chunk_std = sqrt(chunk_std / volsize);
 
+        CufloatToByteKernel<<<(volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(vol.data, chunk_mean, chunk_std, 10, volsize);
+        int j = 0;
+        for (j = 0; j + 20 < thickness; j += 20)
+            mrcvol.WriteBlock<unsigned char>(j, j + 20, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+        mrcvol.WriteBlock<unsigned char>(j, thickness, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+    }
+    else
     {
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
-            mrcvol.WriteBlock(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
-        mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+            mrcvol.WriteBlock<float>(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+        mrcvol.WriteBlock<float>(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
     }
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
@@ -168,7 +192,7 @@ void CuSIRTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
 void CuSARTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
              int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
              int iteration,
-             float gamma)
+             float gamma, const options &opt)
 {
     size_t maxThreadsSize = deviceProps.maxThreadsPerBlock;
 
@@ -226,11 +250,26 @@ void CuSARTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
             CUERR
         }
     }
+    if (opt.f2b)
     {
+        thrust::device_ptr<float> dev_ptr(vol.data);
+        float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volsize) / volsize;
+        float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volsize, [chunk_mean] __device__(float x)
+                                                   { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+        chunk_std = sqrt(chunk_std / volsize);
+
+        CufloatToByteKernel<<<(volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(vol.data, chunk_mean, chunk_std, 10, volsize);
+        int j = 0;
+        for (j = 0; j + 20 < thickness; j += 20)
+            mrcvol.WriteBlock<unsigned char>(j, j + 20, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+        mrcvol.WriteBlock<unsigned char>(j, thickness, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+    }
+    else
+        {
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
-            mrcvol.WriteBlock(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
-        mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+            mrcvol.WriteBlock<float>(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+        mrcvol.WriteBlock<float>(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
     }
 
     cudaFree(vol.data);
@@ -241,7 +280,7 @@ void CuSARTZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
 void CuFBPZ(Point3DF &origin, MrcStackM &projs,
             std::vector<SimCoeff> &params, int thickness,
             MrcStackM &mrcvol, Slice &proj,
-            Volume &vol, int filterMode)
+            Volume &vol, int filterMode, const options &opt)
 {
     size_t maxThreadsSize = deviceProps.maxThreadsPerBlock;
 
@@ -293,14 +332,28 @@ void CuFBPZ(Point3DF &origin, MrcStackM &projs,
         CUERR
         cudaDeviceSynchronize();
         CUERR
+             if (opt.f2b)
+        {
+            thrust::device_ptr<float> dev_ptr(vol.data);
+            float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volsize) / volsize;
+            float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volsize, [chunk_mean] __device__(float x)
+                                                       { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+            chunk_std = sqrt(chunk_std / volsize);
+
+            CufloatToByteKernel<<<(volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(vol.data, chunk_mean, chunk_std, 10, volsize);
+            int j = 0;
+            for (j = 0; j + 20 < thickness; j += 20)
+                mrcvol.WriteBlock<unsigned char>(j, j + 20, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+            mrcvol.WriteBlock<unsigned char>(j, thickness, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+        }
+        else
         {
             int j = 0;
             for (j = 0; j + 20 < thickness; j += 20)
-                mrcvol.WriteBlock(j, j + 20, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
-            mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+                mrcvol.WriteBlock<float>(j, j + 20, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+            mrcvol.WriteBlock<float>(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
         }
     }
-
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);
     cudaFree(originalProjsData);
@@ -308,7 +361,7 @@ void CuFBPZ(Point3DF &origin, MrcStackM &projs,
 
 void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
              int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-             int iteration, int cgiter, float gamma, float soft)
+             int iteration, int cgiter, float gamma, float soft, const options &opt)
 {
     size_t maxThreadsSize = deviceProps.maxThreadsPerBlock;
     int batchsize = 1;
@@ -342,10 +395,7 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
         projs.ReadBlock(j, projs.Z(), 'z', (proj.data + (size_t)projs.X() * projs.Y() * j));
     }
 
-    // cudaEvent_t begin, stop;
-    // cudaEventCreate(&begin);
-    // cudaEventCreate(&stop);
-    // cudaEventRecord(begin);
+
 
     float *htb, *uk, *dk;
     cudaMallocManaged((void **)&htb, sizeof(float) * volsize);
@@ -408,20 +458,29 @@ void CuADMMZ(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     cudaDeviceSynchronize();
     CUERR
 
+    
+    if (opt.f2b)
+    {
+        thrust::device_ptr<float> dev_ptr(vol.data);
+        float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volsize) / volsize;
+        float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volsize, [chunk_mean] __device__(float x)
+                                                   { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+        chunk_std = sqrt(chunk_std / volsize);
+
+        CufloatToByteKernel<<<(volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(vol.data, chunk_mean, chunk_std, 10, volsize);
+        int j = 0;
+        for (j = 0; j + 20 < thickness; j += 20)
+            mrcvol.WriteBlock<unsigned char>(j, j + 20, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+        mrcvol.WriteBlock<unsigned char>(j, thickness, 'z', (vol.data + ((size_t)projs.X() * projs.Y() * j) / 4));
+    }
+    else
     {
         int j = 0;
         for (j = 0; j + 5 < thickness; j += 5)
-            mrcvol.WriteBlock(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
-        mrcvol.WriteBlock(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+            mrcvol.WriteBlock<float>(j, j + 5, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
+        mrcvol.WriteBlock<float>(j, thickness, 'z', (vol.data + (size_t)projs.X() * projs.Y() * j));
     }
-    // CHECK_CUDA(cudaEventRecord(stop))
-    // CHECK_CUDA(cudaEventSynchronize(stop))
-    // float milliseconds = 0.0f;
-    // CHECK_CUDA(cudaEventElapsedTime(&milliseconds, begin, stop))
-    // std::cout << "ADMM reconstruction completed." << std::endl;
-    // std::cout << "Reconstruction time: " << milliseconds / 1000.0f << "s." << std::endl;
-    // CHECK_CUDA(cudaEventDestroy(begin))
-    // CHECK_CUDA(cudaEventDestroy(stop))
+
 
     cudaFree(vol.data);
     CuFreeTaskDataZ(cudev);

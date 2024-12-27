@@ -7,7 +7,7 @@ include_directories(/usr/local/cuda-11.7/targets/x86_64-linux/include)
 find_package(CUDA QUIET REQUIRED)
 
 # Pass options to NVCC
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3  --extended-lambda)
 
 set(CUDA_ARCH_LIST "Auto" CACHE STRING "List of CUDA architectures (e.g. 52, 61, 75)")
 include(FindCUDA/select_compute_arch)

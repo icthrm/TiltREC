@@ -37,6 +37,11 @@ void UsageDual()
 			  << std::endl;
 	std::cout << "    ADMM: ADMM,iteration_number,cgiter,relax_paramete,soft \n"
 			  << std::endl;
+				  << std::endl;
+	std::cout << "[-f2b 2 ]\n"
+			  << std::endl;
+	std::cout << "    Save the output file in byte (0 - 255) format to reduce storage size and improve processing efficiency\n"
+			  << std::endl;
 	std::cout << "-help(-h)" << std::endl;
 	std::cout << "    Help Information\n"
 			  << std::endl;
@@ -72,6 +77,12 @@ void PrintOption(const char *label, int value)
 	std::cout << label << " = " << value << std::endl;
 }
 
+void PrintOption(const char *label, bool value)
+{
+	std::cout << label << " = " << value << std::endl;
+}
+
+
 void PrintOpts(const options &opt)
 {
 	PrintOption("input", opt.input);
@@ -96,6 +107,7 @@ void PrintOpts(const options &opt)
 	PrintOption("cgiter", opt.cgiter);
 	PrintOption("gamma", opt.gamma);
 	PrintOption("soft", opt.soft);
+	PrintOption("f2b", opt.f2b);
 }
 
 void InitOpts(options *opt)
@@ -109,6 +121,7 @@ void InitOpts(options *opt)
 	opt->output[0] = '\0';
 	opt->initial[0] = '\0';
 	opt->axis = "y";
+	opt->f2b = false;
 }
 
 int GetOpts(int argc, char **argv, options *opts_)
@@ -123,14 +136,11 @@ int GetOpts(int argc, char **argv, options *opts_)
 		{"geometry", required_argument, NULL, 'g'},
 		{"method", required_argument, NULL, 'm'},
 		{"axis", required_argument, NULL, 'a'},
-		{"iteration", optional_argument, NULL, 'iter'},
-		{"cgiter", optional_argument, NULL, 'cg'},
-		{"gamma", optional_argument, NULL, 'ga'},
-		{"soft", optional_argument, NULL, 's'},
+		{"f2b", no_argument, NULL, 'f'},
 		{NULL, 0, NULL, 0}};
 
 	int ch;
-	while ((ch = getopt_long(argc, argv, "hi:o:n:g:m:a:", longopts, NULL)) != -1)
+	while ((ch = getopt_long(argc, argv, "hi:o:n:t:g:m:a:f", longopts, NULL)) != -1)
 	{
 		switch (ch)
 		{
@@ -148,7 +158,6 @@ int GetOpts(int argc, char **argv, options *opts_)
 
 		case 'i':
 		{
-			// std::cout << "optarg value for 'INPUT': " << optarg << std::endl;
 			std::stringstream iss(optarg);
 			iss >> opts_->input;
 
@@ -157,13 +166,6 @@ int GetOpts(int argc, char **argv, options *opts_)
 				EX_TRACE("Too many arguments for input '%s'.\n", optarg);
 				return -1;
 			}
-
-			// std::ifstream inputFile(optarg);
-			// if (!inputFile.is_open())
-			// {
-			// 	std::cerr << "Failed to open input file: " << optarg << std::endl;
-			// 	return -1;
-			// }
 
 			if (iss.fail())
 			{
@@ -331,7 +333,19 @@ int GetOpts(int argc, char **argv, options *opts_)
 				return -1;
 			}
 		}
+		break;
+		
+		case 'f':
+		{
+			opts_->f2b = true;
+	
+			if (optarg!= NULL)
+			{
+				EX_TRACE("Too many arguments for f2b '%s'.\n", optarg);
+				return -1;
+			}
 
+		}
 		break;
 
 		case 0:

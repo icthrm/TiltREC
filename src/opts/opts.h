@@ -34,6 +34,7 @@ struct options
 	int cgiter;
 	float gamma;
 	float soft;
+	bool f2b;
 };
 
 void UsageDual();

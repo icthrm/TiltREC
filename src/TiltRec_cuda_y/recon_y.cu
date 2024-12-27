@@ -7,7 +7,7 @@ void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, float *tmp
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.slice_steplength = volinfo.Y_add_left + volinfo.steplength + volinfo.Y_add_right;
-  //volinfo.steplength = max(64, gridYMax);
+  volinfo.steplength = max(64, gridYMax);
   if (y < volinfo.Y_add_left)
   {
     volinfo.Y_add_left = y;
@@ -34,7 +34,7 @@ void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, int y, int
 {
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
-  //volinfo.steplength = min(64, gridYMax);
+  volinfo.steplength = min(64, gridYMax);
   volinfo.steplength = min(volinfo.steplength, static_cast<float>(length));
 
   if (y < volinfo.Y_add_left)
@@ -101,7 +101,7 @@ void InitBodyInfo(Bodyinfo &volinfo, float pitch_angle, MrcStackM &projs, int th
   volinfo.Y_add_right = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.Y_add_left = ceil(fabsf(tan(D2R(pitch_angle))) * thickness);
   volinfo.steplength = 64;
-  //volinfo.steplength = max(64, gridYMax);
+  volinfo.steplength = max(64, gridYMax);
   volinfo.steplength = min(volinfo.steplength, static_cast<float>(length));
   volinfo.slice_steplength = volinfo.Y_add_left + volinfo.steplength + volinfo.Y_add_right;
   volinfo.volsize = (size_t)projs.X() * thickness * volinfo.slice_steplength;
@@ -109,10 +109,16 @@ void InitBodyInfo(Bodyinfo &volinfo, float pitch_angle, MrcStackM &projs, int th
   volinfo.volslicesize = (size_t)projs.X() * thickness * volinfo.steplength;
 }
 void CuBackProject(Point3DF &origin, MrcStackM &projs,
-                   std::vector<SimCoeff> &params, int thickness,
+                   std::vector<SimCoeff> &params,
                    MrcStackM &mrcvol, Slice &proj,
-                   Volume &vol, float pitch_angle, int start, int length, int add_left)
+                   Volume &vol, int start, int length, int add_left, const options &opt)
 {
+  float pitch_angle = opt.pitch_angle;
+  int thickness = opt.thickness;
+  float alpha = 0.9;
+  float global_mean = 0;
+  float global_std = 0;
+
   int gridYMax;
   int maxThreadsSize = 128;
   InitYMAX(&gridYMax, maxThreadsSize, projs, thickness, length);
@@ -155,18 +161,44 @@ void CuBackProject(Point3DF &origin, MrcStackM &projs,
     {
       offset = projs.X() * thickness * volinfo.Y_add_left;
     }
-    CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+    if (opt.f2b)
+    {
 
-    mrcvol.WriteBlock(y, y + volinfo.steplength, 'z', vol.data);
+      thrust::device_ptr<float> dev_ptr(cudev.slice);
+      // 计算当前块均值和标准差
+      float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volinfo.volsize) / volinfo.volsize;
+      float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volinfo.volsize, [chunk_mean] __device__(float x)
+                                                 { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+      chunk_std = sqrt(chunk_std / volinfo.volsize);
+
+      // 更新全局均值和标准差
+      global_mean = alpha * global_mean + (1 - alpha) * chunk_mean;
+      global_std = alpha * global_std + (1 - alpha) * chunk_std;
+
+      CufloatToByteKernel<<<(volinfo.volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(cudev.slice, global_mean, global_std, 10, volinfo.volsize);
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(char) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<unsigned char>(y, y + volinfo.steplength, 'z', vol.data);
+    }
+    else
+    {
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<float>(y, y + volinfo.steplength, 'z', vol.data);
+    }
   }
   CuFreeTaskData(cudev);
   cudaFreeHost(vol.data);
 }
 
 void CuFBP(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-           int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-           int filterMode, float pitch_angle, int start, int length, int add_left)
+           MrcStackM &mrcvol, Slice &proj, Volume &vol,
+           int filterMode, int start, int length, int add_left, const options &opt)
 {
+  const int thickness = opt.thickness;
+  const float pitch_angle = opt.pitch_angle;
+  float alpha = 0.9;
+  float global_mean = 0;
+  float global_std = 0;
+
   int gridYMax;
   int maxThreadsSize = 128;
   InitYMAX(&gridYMax, maxThreadsSize, projs, thickness, length);
@@ -180,7 +212,7 @@ void CuFBP(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
 
   CuMallocBPTTaskData(cudev, projs.Z(), projs.X(), thickness, volinfo.slice_steplength);
   float oy = origin.y;
- // ApplyFilterInplace(projs, proj.data, length, filterMode);
+  // ApplyFilterInplace(projs, proj.data, length, filterMode);
   for (int y = start; y < start + vol.height; y += volinfo.steplength)
   {
     ReadSliceBlock(vol, volinfo, projs, y, thickness, gridYMax, pitch_angle, start, length);
@@ -212,20 +244,46 @@ void CuFBP(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     {
       offset = projs.X() * thickness * volinfo.Y_add_left;
     }
+    if (opt.f2b)
+    {
 
-    CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
-    mrcvol.WriteBlock(y, y + volinfo.steplength, 'z', vol.data);
+      thrust::device_ptr<float> dev_ptr(cudev.slice);
+      // 计算当前块均值和标准差
+      float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volinfo.volsize) / volinfo.volsize;
+      float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volinfo.volsize, [chunk_mean] __device__(float x)
+                                                 { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+      chunk_std = sqrt(chunk_std / volinfo.volsize);
+
+      // 更新全局均值和标准差
+      global_mean = alpha * global_mean + (1 - alpha) * chunk_mean;
+      global_std = alpha * global_std + (1 - alpha) * chunk_std;
+
+      CufloatToByteKernel<<<(volinfo.volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(cudev.slice, global_mean, global_std, 10, volinfo.volsize);
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(char) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<unsigned char>(y, y + volinfo.steplength, 'z', vol.data);
+    }
+    else
+    {
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<float>(y, y + volinfo.steplength, 'z', vol.data);
+    }
   }
   CuFreeTaskData(cudev);
   CHECK_CUDA(cudaFreeHost(vol.data))
 }
 
 void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-            int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-            int iteration,
-            float gamma,
-            float pitch_angle, int start, int length, int add_left)
+            MrcStackM &mrcvol, Slice &proj, Volume &vol,
+            int start, int length, int add_left, const options &opt)
 {
+  const int thickness = opt.thickness;
+  const int iteration = opt.iteration;
+  const float gamma = opt.gamma;
+  const float pitch_angle = opt.pitch_angle;
+  float alpha = 0.9;
+  float global_mean = 0;
+  float global_std = 0;
+
   int gridYMax;
   int maxThreadsSize = 128;
   InitYMAX(&gridYMax, maxThreadsSize, projs, thickness, length);
@@ -267,13 +325,11 @@ void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     dim3 dim2Grid_xy((projs.X() * volinfo.slice_steplength + maxThreadsSize - 1) / maxThreadsSize, projs.Z());
     dim3 dim2Grid_xz((projs.X() * thickness + maxThreadsSize - 1) / maxThreadsSize, projs.Z());
 
-    CHECK_CUDA(cudaMemset(cudev.slice, 0, sizeof(float) * volinfo.volsize))
-
     for (int z = 0; z < projs.Z(); z++)
     {
       size_t sliceOffset = z * projs.X() * length + (y - start + add_left - volinfo.Y_add_left) * projs.X();
       float *hostPtr = proj.data + sliceOffset;
-      float *devicePtr = cudev.projs + static_cast<size_t>(z * volinfo.slice_steplength * projs.X());
+      float *devicePtr = cudev.projs + (int)(z * volinfo.slice_steplength * projs.X());
       CHECK_CUDA(cudaMemcpy(devicePtr, hostPtr, sizeof(float) * volinfo.slice_steplength * projs.X(), cudaMemcpyHostToDevice))
     }
 
@@ -286,6 +342,7 @@ void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     extent.height = cudev.y;
     extent.depth = projs.Z();
     CHECK_CUDA(cudaMalloc3DArray(&projarray, &desc, extent))
+    CHECK_CUDA(cudaMemset(cudev.slice, 0, sizeof(float) * volinfo.volsize))
 
     for (int i = 0; i < iteration; i++)
     {
@@ -328,13 +385,33 @@ void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     {
       offset = projs.X() * thickness * volinfo.Y_add_left;
     }
-    CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+    if (opt.f2b)
+    {
 
-    printf("Writing data to file\n");
-    mrcvol.WriteBlock(y, y + volinfo.steplength, 'z', vol.data);
+      thrust::device_ptr<float> dev_ptr(cudev.slice);
+      // 计算当前块均值和标准差
+      float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volinfo.volsize) / volinfo.volsize;
+      float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volinfo.volsize, [chunk_mean] __device__(float x)
+                                                 { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+      chunk_std = sqrt(chunk_std / volinfo.volsize);
+
+      // 更新全局均值和标准差
+      global_mean = alpha * global_mean + (1 - alpha) * chunk_mean;
+      global_std = alpha * global_std + (1 - alpha) * chunk_std;
+
+      CufloatToByteKernel<<<(volinfo.volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(cudev.slice, global_mean, global_std, 10, volinfo.volsize);
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(char) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<unsigned char>(y, y + volinfo.steplength, 'z', vol.data);
+    }
+    else
+    {
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<float>(y, y + volinfo.steplength, 'z', vol.data);
+    }
 
     CHECK_CUDA(cudaFreeArray(projarray))
   }
+
   CuFreeTaskData(cudev);
   CHECK_CUDA(cudaFree(valvol))
   CHECK_CUDA(cudaFree(bpwt))
@@ -343,11 +420,17 @@ void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
 }
 
 void CuSART(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-            int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-            int iteration,
-            float gamma,
-            float pitch_angle, int start, int length, int add_left)
+            MrcStackM &mrcvol, Slice &proj, Volume &vol,
+            int start, int length, int add_left, const options &opt)
 {
+  int thickness = opt.thickness;
+  int iteration = opt.iteration;
+  float gamma = opt.gamma;
+  float pitch_angle = opt.pitch_angle;
+  float alpha = 0.9;
+  float global_mean = 0;
+  float global_std = 0;
+
   int gridYMax;
   int maxThreadsSize = 128;
   InitYMAX(&gridYMax, maxThreadsSize, projs, thickness, length);
@@ -411,9 +494,29 @@ void CuSART(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
     {
       offset = projs.X() * thickness * volinfo.Y_add_left;
     }
-    CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
-    printf("Write data to file\n");
-    mrcvol.WriteBlock(y, y + volinfo.steplength, 'z', vol.data);
+    if (opt.f2b)
+    {
+
+      thrust::device_ptr<float> dev_ptr(cudev.slice);
+      // 计算当前块均值和标准差
+      float chunk_mean = thrust::reduce(dev_ptr, dev_ptr + volinfo.volsize) / volinfo.volsize;
+      float chunk_std = thrust::transform_reduce(dev_ptr, dev_ptr + volinfo.volsize, [chunk_mean] __device__(float x)
+                                                 { return (x - chunk_mean) * (x - chunk_mean); }, 0.0f, thrust::plus<float>());
+      chunk_std = sqrt(chunk_std / volinfo.volsize);
+
+      // 更新全局均值和标准差
+      global_mean = alpha * global_mean + (1 - alpha) * chunk_mean;
+      global_std = alpha * global_std + (1 - alpha) * chunk_std;
+
+      CufloatToByteKernel<<<(volinfo.volsize / 4 + maxThreadsSize - 1) / maxThreadsSize, dimBlock>>>(cudev.slice, global_mean, global_std, 10, volinfo.volsize);
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(char) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<unsigned char>(y, y + volinfo.steplength, 'z', vol.data);
+    }
+    else
+    {
+      CHECK_CUDA(cudaMemcpy(vol.data, cudev.slice + offset, sizeof(float) * volinfo.volslicesize, cudaMemcpyDeviceToHost))
+      mrcvol.WriteBlock<float>(y, y + volinfo.steplength, 'z', vol.data);
+    }
   }
   CuFreeTaskData(cudev);
   CHECK_CUDA(cudaFreeHost(vol.data))

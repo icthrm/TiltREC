@@ -33,6 +33,7 @@ struct options
 	int cgiter;
 
 	float soft;
+	bool f2b;
 };
 
 inline void UsageDual()

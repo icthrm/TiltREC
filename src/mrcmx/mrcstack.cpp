@@ -54,11 +54,14 @@ bool MrcStackM::WriteToFile(const char *filename)
   return !rc;
 }
 
-void MrcStackM::InitializeHeader()
+void MrcStackM::InitializeHeader(int type)
 {
   memset(&header, 0, sizeof(MRCheader));
 
-  header.mode = MODE_FLOAT;
+  if (type == 1)
+    header.mode = MODE_FLOAT;
+  else
+    header.mode = MODE_BYTE;
   header.mx = 1;
   header.my = 1;
   header.mz = 1;
@@ -436,15 +439,26 @@ void MrcStackM::ReadBlock(int start, int end, char axis, float *blockdata)
   delete[] buf;
 }
 
+template <>
+MPI_Datatype MrcStackM::get_mpi_type<unsigned char>()
+{
+  return MPI_UNSIGNED_CHAR;
+}
+
+template <>
+MPI_Datatype MrcStackM::get_mpi_type<float>()
+{
+  return MPI_FLOAT;
+}
+template <typename T>
 void MrcStackM::WriteBlock(int start, int end, char axis, float *blockdata)
 {
-  int psize = sizeof(float);
+    int psize = sizeof(T);
   size_t del = end - start;
 
   MPI_Offset offset = sizeof(MrcHeader) + header.next;
   MPI_File_seek(output, offset, MPI_SEEK_SET);
-
-  // 	std::cout<<"write block ("<<start<<","<<end<<")"<<std::endl;
+  MPI_Datatype mpi_type = get_mpi_type<T>();
 
   switch (axis)
   {
@@ -457,7 +471,7 @@ void MrcStackM::WriteBlock(int start, int end, char axis, float *blockdata)
       for (int j = 0; j < header.ny; j++)
       {
         MPI_File_write(output, blockdata + j * del + k * del * header.ny, del,
-                       MPI_FLOAT, MPI_STATUS_IGNORE);
+                       mpi_type, MPI_STATUS_IGNORE);
         offset = (header.nx - del) * psize;
         MPI_File_seek(output, offset, MPI_SEEK_CUR);
       }
@@ -471,7 +485,7 @@ void MrcStackM::WriteBlock(int start, int end, char axis, float *blockdata)
     for (int k = 0; k < header.nz; k++)
     {
       MPI_File_write(output, blockdata + k * del * header.nx, del * header.nx,
-                     MPI_FLOAT, MPI_STATUS_IGNORE);
+                     mpi_type, MPI_STATUS_IGNORE);
       offset = header.nx * (header.ny - del) * psize;
       MPI_File_seek(output, offset, MPI_SEEK_CUR);
     }
@@ -481,11 +495,14 @@ void MrcStackM::WriteBlock(int start, int end, char axis, float *blockdata)
   case 'Z':
     offset = header.nx * header.ny * psize;
     MPI_File_seek(output, start * offset, MPI_SEEK_CUR);
-    MPI_File_write(output, blockdata, header.nx * header.ny * del, MPI_FLOAT,
+    MPI_File_write(output, blockdata, header.nx * header.ny * del, mpi_type,
                    MPI_STATUS_IGNORE);
     break;
   }
 }
+// 显式实例化模板函数
+template void MrcStackM::WriteBlock<float>(int, int, char, float *);
+template void MrcStackM::WriteBlock<unsigned char>(int, int, char, float *);
 
 void MrcStackM::WriteBlockRotX(int start, int end, char axis,
                                float *blockdata)

@@ -9,7 +9,7 @@ include_directories(/usr/local/cuda-11.1/targets/x86_64-linux/include)
 
 # Pass options to NVCC
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3)
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lcufftw -lcufft -lculibos)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lcufftw -lcufft -lculibos  --extended-lambda)
 
 set(CUDA_ARCH_LIST "Auto" CACHE STRING "List of CUDA architectures (e.g. 52, 61, 75)")
 include(FindCUDA/select_compute_arch)

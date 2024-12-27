@@ -5,14 +5,14 @@
 // #include <cuda_runtime.h>
 #include "basic.cuh"
 #include "mrcmx/mrcstack.h"
-
+#include <thrust/device_vector.h>
+#include <thrust/extrema.h>
+#include <thrust/functional.h>
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include "../filter/filter_prj.h"
-#include <cusolverDn.h>
-#include <cublas_v2.h>
-#include <cusparse.h>
+#include "../opts/opts.h"
 void InitYMAX(int *gridYMax, int maxThreadsSize, MrcStackM &projs, int thickness);
 void InitYMAX(int *gridYMax, int maxThreadsSize, MrcStackM &projs, int thickness, int length);
 
@@ -23,24 +23,20 @@ void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, float *tmp
 void ReadSliceBlock(Volume &vol, Bodyinfo &volinfo, MrcStackM &projs, int y, int thickness, int gridYMax, float pitch_angle, int start, int length);
 
 void CuBackProject(Point3DF &origin, MrcStackM &projs,
-                   std::vector<SimCoeff> &params, int thickness,
+                   std::vector<SimCoeff> &params,
                    MrcStackM &mrcvol, Slice &proj,
-                   Volume &vol, float pitch_angle, int start, int length, int add_left);
+                   Volume &vol, int start, int length, int add_left, const options &opt);
 
 void CuFBP(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-           int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-           int filterMode, float pitch_angle, int start, int length, int add_left);
+            MrcStackM &mrcvol, Slice &proj, Volume &vol,
+           int filterMode, int start, int length, int add_left, const options &opt);
 
 void CuSIRT(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-            int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-            int iteration,
-            float gamma,
-            float pitch_angle, int start, int length, int add_left);
+            MrcStackM &mrcvol, Slice &proj, Volume &vol,
+            int start, int length, int add_left, const options &opt);
 
 void CuSART(Point3DF &origin, MrcStackM &projs, std::vector<SimCoeff> &params,
-            int thickness, MrcStackM &mrcvol, Slice &proj, Volume &vol,
-            int iteration,
-            float gamma,
-            float pitch_angle, int start, int length, int add_left);
+            MrcStackM &mrcvol, Slice &proj, Volume &vol,
+            int start, int length, int add_left, const options &opt);
 
 #endif

@@ -138,34 +138,25 @@ void ExeRecY(options &opt, Point3DF &origin, MrcStackM &projs, std::vector<SimCo
 {
   if (opt.method == "BPT")
   {
-    printf("Start using BPT for reconstruction.\n  ");
-    CuBackProject(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.pitch_angle, start, length, add_left);
+    CuBackProject(origin, projs, params, mrcvol, proj, vol,  start, length, add_left,opt);
   }
   else if (opt.method == "SIRT")
   {
-    printf("Start using SIRT for reconstruction.\n  ");
-    CuSIRT(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.iteration, opt.gamma, opt.pitch_angle, start, length, add_left);
+    CuSIRT(origin, projs, params, mrcvol, proj, vol, start, length, add_left, opt);
   }
   else if (opt.method == "SART")
   {
-    printf("Start using SART for reconstruction. \n ");
-    CuSART(origin, projs, params, opt.thickness, mrcvol, proj, vol, opt.iteration, opt.gamma, opt.pitch_angle, start, length, add_left);
+    CuSART(origin, projs, params, mrcvol, proj, vol, start, length, add_left, opt);
   }
   else if (opt.method == "FBP")
   {
-    printf("Start using FBP for reconstruction.\n  ");
     ApplyFilterInplace(projs, proj.data, length, 0);
-    CuFBP(origin, projs, params, opt.thickness, mrcvol, proj, vol, 0, opt.pitch_angle, start, length, add_left);
+    CuFBP(origin, projs, params,  mrcvol, proj, vol, 0,  start, length, add_left,opt);
   }
   else if (opt.method == "WBP")
   {
-    printf("Start using WBP for reconstruction.\n  ");
     ApplyFilterInplace(projs, proj.data, length, 2);
-    CuFBP(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2, opt.pitch_angle, start, length, add_left);
-  }
-  else if (opt.method == "ADMM")
-  {
-    printf("TiltRec-cuda does not provide the ADMM method. Please use TiltRecZ-cuda or TiltRecZ-mpi.\n  ");
+    CuFBP(origin, projs, params,  mrcvol, proj, vol, 2,  start, length, add_left,opt);
   }
 }
 int ATOM_GPU(options &opt, int myid, int procs)
@@ -234,8 +225,10 @@ int ATOM_GPU(options &opt, int myid, int procs)
   origin.x = projs.X() * .5;
   origin.y = projs.Y() * .5;
   origin.z = opt.thickness * .5;
-
-  mrcvol.InitializeHeader();
+  if (opt.f2b)
+    mrcvol.InitializeHeader(0);
+  else
+    mrcvol.InitializeHeader();
   mrcvol.SetSize(projs.X(), opt.thickness,
                  projs.Y());
   mrcvol.WriteToFile(opt.output);

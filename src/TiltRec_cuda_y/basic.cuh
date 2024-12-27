@@ -97,4 +97,5 @@ __global__ void CuReWeightKernel(float *reproj_wt, int volcor_x, int volcor_y, i
 // Update the 3D volume
 __global__ void CuUpdateVolumeByWeightsKernel(float *slice, float *valvol, float *wtvol, float gamma, size_t maxN);
 __global__ void CuUpdateVolumeByProjDiffKernel_SART(float *proj, float *vol, int volcor_x, int volcor_y, int volcor_z, int angidx, float gamma);
+__global__ void CufloatToByteKernel(float* d_floatData, float mean, float std, float scale_factor, size_t maxN) ;
 #endif

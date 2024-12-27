@@ -734,3 +734,39 @@ __global__ void Cu_dk_ADMM_Z(float *d_k, float *u_k, float *voldata, int volsize
 	size_t validx = xyId;
 	d_k[validx] += voldata[validx] - u_k[validx];
 }
+
+
+__global__ void CufloatToByteKernel(float* d_floatData, float mean, float std, float scale_factor, size_t maxN) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // 每个线程处理 4 个 float 数据
+    int output_idx = idx;  // 结果存储的索引
+    int input_start = idx * 4; // 每个线程的起始输入索引
+
+    // 确保不会越界访问
+    if (input_start + 3 < maxN) {
+        unsigned char byte_value[4]; // 存储当前线程的 4 个结果
+
+        for (int i = 0; i < 4; ++i) {
+            float value = d_floatData[input_start + i];
+            // 标准化：计算 Z-Score
+            value = (value - mean) / std;
+
+            // 限制到 [-scale_factor, scale_factor] 范围内
+            value = fmaxf(-scale_factor, fminf(scale_factor, value));
+
+            // 映射到 [0, 255]
+            value = ((value + scale_factor) / (2.0f * scale_factor)) * 255.0f;
+
+            // 转为 unsigned char
+            byte_value[i] = static_cast<unsigned char>(value);
+        }
+
+        // 将结果写回 d_floatData，但存储到原数组的前 1/4 空间
+        unsigned char* byte_ptr = reinterpret_cast<unsigned char*>(d_floatData);
+        byte_ptr[output_idx * 4 + 0] = byte_value[0];
+        byte_ptr[output_idx * 4 + 1] = byte_value[1];
+        byte_ptr[output_idx * 4 + 2] = byte_value[2];
+        byte_ptr[output_idx * 4 + 3] = byte_value[3];
+    }
+}

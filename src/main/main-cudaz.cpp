@@ -13,16 +13,7 @@
 #include <ctime>
 #include <cuda.h>
 #include <cuda_runtime.h>
-// #define BLOCKDIM 512
-// #define CHECK_CUDA(func)                                         \
-//   {                                                              \
-//     cudaError_t status = (func);                                 \
-//     if (status != cudaSuccess)                                   \
-//     {                                                            \
-//       printf("CUDA API failed at line %d with error: %s (%d)\n", \
-//              __LINE__, cudaGetErrorString(status), status);      \
-//     }                                                            \
-//   }
+
 #define CUDA_CHECK_RETURN(value) CheckCudaErrorAux(__FILE__, __LINE__, #value, value)
 cudaDeviceProp deviceProps;
 
@@ -174,7 +165,10 @@ int ATOM_GPUZ(options &opt, int myid, int procs)
   printf("geo= %.2f %.2f %.2f\n", geo.offset, geo.pitch_angle, geo.zshift);
   DecorateSimCoefficients(params, geo);
 
-  mrcvol.InitializeHeader();
+  if (opt.f2b)
+    mrcvol.InitializeHeader(0);
+  else
+    mrcvol.InitializeHeader();
   mrcvol.SetSize(projs.X(), projs.Y(), opt.thickness);
   mrcvol.WriteToFile(opt.output);
 
@@ -212,39 +206,31 @@ int ATOM_GPUZ(options &opt, int myid, int procs)
   /** start cuda logic **/
   InitializeCuda(myid);
 
-
   if (opt.method == "BPT")
   {
-    printf("Start using BPT for reconstruction.\n ");
-    CuBackProjectZ(origin, projs, params, opt.thickness, mrcvol, proj, vol);
+    CuBackProjectZ(origin, projs, params, mrcvol, proj, vol, opt);
   }
   else if (opt.method == "FBP")
   {
-    printf("Start using FBP for reconstruction. \n ");
-    CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 0);
+    CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 0, opt);
   }
   else if (opt.method == "WBP")
   {
-    printf("Start using WBP for reconstruction.\n  ");
-    CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2);
+    CuFBPZ(origin, projs, params, opt.thickness, mrcvol, proj, vol, 2, opt);
   }
   else if (opt.method == "SIRT")
   {
-    printf("Start using SIRT for reconstruction. \n ");
-    CuSIRTZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
-            opt.iteration, opt.gamma);
+    CuSIRTZ(origin, projs, params, mrcvol, proj, vol, opt);
   }
   else if (opt.method == "SART")
   {
-    printf("Start using SART for reconstruction.\n  ");
     CuSARTZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
-            opt.iteration, opt.gamma);
+            opt.iteration, opt.gamma,opt);
   }
   else if (opt.method == "ADMM")
   {
-    printf("Start using ADMM for reconstruction.\n  ");
     CuADMMZ(origin, projs, params, opt.thickness, mrcvol, proj, vol,
-            opt.iteration, opt.cgiter, opt.gamma, opt.soft);
+            opt.iteration, opt.cgiter, opt.gamma, opt.soft, opt);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
