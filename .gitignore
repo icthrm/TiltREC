@@ -1,0 +1,6 @@
+.history/
+.vscode/
+build/
+data/
+src/.history/
+src/.vscode/
