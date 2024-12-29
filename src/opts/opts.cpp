@@ -3,27 +3,27 @@
 
 void UsageDual()
 {
-	std::cout << "[-INPUT(-i) Input Filename]\n"
+	std::cout << "[--input(-i) Input Filename]\n"
 			  << std::endl;
 	std::cout << "    MRC file for reconstruction\n"
 			  << std::endl;
-	std::cout << "[-OUTPUT(-o) Output Filename]\n"
+	std::cout << "[--output(-o) Output Filename]\n"
 			  << std::endl;
 	std::cout << "    MRC filename for result\n"
 			  << std::endl;
-	std::cout << "[-TILTFILE(-t) Tilt Angle Filename]\n"
+	std::cout << "[--tiltfile(-t) Tilt Angle Filename]\n"
 			  << std::endl;
 	std::cout << "    Tilt Angles\n"
 			  << std::endl;
-	std::cout << "[-INITIAL Initial Reconstruction Filename]\n"
+	std::cout << "[--inital(-n) Initial Reconstruction Filename]\n"
 			  << std::endl;
 	std::cout << "    MRC file as initial model (reconstruction) for iteration methods (optinal)\n"
 			  << std::endl;
-	std::cout << "[-GEOMETRY(-g) 4 ints]\n"
+	std::cout << "[ --geometry(-g) 4 ints]\n"
 			  << std::endl;
 	std::cout << "    Geometry information: offset,pitch_angle,zshift,thickness\n"
 			  << std::endl;
-	std::cout << "[-METHOD(-m) Method Name(I,R)]\n"
+	std::cout << "[--method(-m) Method Name(I,R)]\n"
 			  << std::endl;
 	std::cout << "    Back Projection: BPT\n"
 			  << std::endl;
