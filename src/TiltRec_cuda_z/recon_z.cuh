@@ -9,7 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <ctime>
-#include "../reconstruction_y/basic.cuh"
+#include "../TiltRec_cuda_y/basic.cuh"
 #include "../opts/opts.h"
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>

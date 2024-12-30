@@ -14,27 +14,7 @@
 
 #define D2R(__ANGLE__) ((__ANGLE__) * PI_180)
 
-void TestMrcWriteToFile(MrcStackM &testMrc, const char *filename)
-{
-	testMrc.SetZ(1);
-	testMrc.WriteToFile(filename);
-}
 
-void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float *blockdata)
-{
-	if (not('z' == axis || 'Z' == axis))
-	{
-		printf("Wrong test write block axis!\n");
-		exit(-10);
-	}
-	const int TestWriteSlice = 151;
-	if (start <= TestWriteSlice && TestWriteSlice < end)
-	{
-		int num = end - start;
-		int sliceSize = testMrc.header.nx * testMrc.header.ny;
-		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize); // WriteBlock函数不包括end
-	}
-}
 
 struct Coeff
 {
@@ -839,7 +819,7 @@ int ATOM(options &opt, int myid, int procs)
 		printf("TiltRec-mpi does not provide the ADMM method. Please use TiltRecZ-cuda or TiltRecZ-mpi.\n  ");
 	}
 
-	mrcvol.WriteBlock(start, start + length, 'z', vol.data);
+	mrcvol.WriteBlock<float>(start, start + length, 'z', vol.data);
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (myid == 0)

@@ -13,29 +13,6 @@
 #endif
 
 #define D2R(__ANGLE__) ((__ANGLE__) * PI_180)
-
-void TestMrcWriteToFile(MrcStackM &testMrc, const char *filename)
-{
-	testMrc.SetZ(1);
-	testMrc.WriteToFile(filename);
-}
-
-void TestMrcWriteBlock(MrcStackM &testMrc, int start, int end, char axis, float *blockdata)
-{
-	if (not('z' == axis || 'Z' == axis))
-	{
-		printf("Wrong test write block axis!\n");
-		exit(-10);
-	}
-	const int TestWriteSlice = 151;
-	if (start <= TestWriteSlice && TestWriteSlice < end)
-	{
-		int num = end - start;
-		int sliceSize = testMrc.header.nx * testMrc.header.ny;
-		testMrc.WriteBlock(0, 1, axis, blockdata + (TestWriteSlice - start) * sliceSize);
-	}
-}
-
 struct Coeff
 {
 	union
@@ -1183,7 +1160,7 @@ int ATOM(options &opt, int myid, int procs)
 		mrcvol.WriteHeader();
 	}
 
-	mrcvol.WriteBlock(vol.z, vol.z + height, 'z', vol.data); // test-------------------------
+	mrcvol.WriteBlock<float>(vol.z, vol.z + height, 'z', vol.data); // test-------------------------
 	// TestMrcWriteBlock(mrcvol, vol.z, vol.z + height, 'z', vol.data); // test-------------------------
 
 	MPI_Barrier(MPI_COMM_WORLD);

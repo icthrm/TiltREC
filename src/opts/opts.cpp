@@ -37,7 +37,6 @@ void UsageDual()
 			  << std::endl;
 	std::cout << "    ADMM: ADMM,iteration_number,cgiter,relax_paramete,soft \n"
 			  << std::endl;
-				  << std::endl;
 	std::cout << "[-f2b 2 ]\n"
 			  << std::endl;
 	std::cout << "    Save the output file in byte (0 - 255) format to reduce storage size and improve processing efficiency\n"
