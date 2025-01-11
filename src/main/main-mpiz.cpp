@@ -1086,11 +1086,7 @@ int ATOM(options &opt, int myid, int procs)
 
 	size_t size = static_cast<size_t>(vol.length) * static_cast<size_t>(vol.width) * static_cast<size_t>(vol.height);
 
-	// printf("size:%llu\n", size);
-	// printf("length:%d\n", vol.length);
 
-	// printf("width:%d\n", vol.width);
-	// printf("height:%d\n", vol.height);
 	try
 	{
 		vol.data = new float[size];

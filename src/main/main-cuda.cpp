@@ -14,6 +14,40 @@
 #define CUDA_CHECK_RETURN(value) CheckCudaErrorAux(__FILE__, __LINE__, #value, value)
 cudaDeviceProp deviceProps;
 
+bool safe_multiply(int a, int b, long long &result)
+{
+  // Check if multiplication will overflow
+  if (a > std::numeric_limits<int>::max() / b)
+  {
+    // Overflow would occur
+    return false;
+  }
+  result = static_cast<long long>(a) * b;
+  return true;
+}
+
+// Function to calculate the product of a, b, and c
+bool calculate_prosize(int a, int b, int c, long long &result)
+{
+  long long temp;
+
+  // First multiply a and b
+  if (!safe_multiply(a, b, temp))
+  {
+    std::cerr << "Overflow occurred during multiplication of a and b!" << std::endl;
+    return false;
+  }
+
+  // Then multiply the result with c
+  if (!safe_multiply(temp, c, result))
+  {
+    std::cerr << "Overflow occurred during multiplication with c!" << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 bool ReadAngles(std::vector<float> &angles, const char *name)
 {
   std::ifstream in(name);
@@ -138,7 +172,7 @@ void ExeRecY(options &opt, Point3DF &origin, MrcStackM &projs, std::vector<SimCo
 {
   if (opt.method == "BPT")
   {
-    CuBackProject(origin, projs, params, mrcvol, proj, vol,  start, length, add_left,opt);
+    CuBackProject(origin, projs, params, mrcvol, proj, vol, start, length, add_left, opt);
   }
   else if (opt.method == "SIRT")
   {
@@ -151,12 +185,12 @@ void ExeRecY(options &opt, Point3DF &origin, MrcStackM &projs, std::vector<SimCo
   else if (opt.method == "FBP")
   {
     ApplyFilterInplace(projs, proj.data, length, 0);
-    CuFBP(origin, projs, params,  mrcvol, proj, vol, 0,  start, length, add_left,opt);
+    CuFBP(origin, projs, params, mrcvol, proj, vol, 0, start, length, add_left, opt);
   }
   else if (opt.method == "WBP")
   {
     ApplyFilterInplace(projs, proj.data, length, 2);
-    CuFBP(origin, projs, params,  mrcvol, proj, vol, 2,  start, length, add_left,opt);
+    CuFBP(origin, projs, params, mrcvol, proj, vol, 2, start, length, add_left, opt);
   }
 }
 int ATOM_GPU(options &opt, int myid, int procs)
@@ -249,8 +283,9 @@ int ATOM_GPU(options &opt, int myid, int procs)
   InitializeCuda(myid);
 
   length = length + add_left + add_right;
-  size_t prosize=projs.X() * length * projs.Z();
-  CHECK_CUDA(cudaHostAlloc((void **)(&proj.data), static_cast<size_t>(sizeof(float) *prosize), cudaHostAllocDefault))
+  long long prosize;
+  calculate_prosize(projs.X(), length, projs.Z(), prosize);
+  CHECK_CUDA(cudaHostAlloc((void **)(&proj.data), static_cast<long long>(sizeof(float)) * prosize, cudaHostAllocDefault))
 
   float *tmp = nullptr;
   try

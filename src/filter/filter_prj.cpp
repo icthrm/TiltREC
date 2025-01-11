@@ -676,7 +676,8 @@ static void filter_Rweighting_1D_many(float *data, int Nx, int Ny, float radial,
     int Nx_padding = int(Nx / 10);
     int Nx_final = Nx + Nx_padding;
     fftwf_plan plan_fft, plan_ifft;
-    float *bufc = new float[(Nx_final + 2 - Nx_final % 2) * Ny]; 
+    long long tmp=static_cast<long long>(Nx_final + 2 - Nx_final % 2) * static_cast<long long>(Ny);
+    float *bufc = new float[tmp]; 
 
 
     plan_fft = fftwf_plan_many_dft_r2c(1, &Nx_final, Ny, (float *)bufc, NULL, 1, (Nx_final + 2 - Nx_final % 2),

@@ -68,25 +68,7 @@ public:
 
 void EX_THROW(const char* x);
 
-//ex::Puts("", MSG, ##args, "\0");
-// void Puts(const char* msg, ...)
-// {
-//     va_list args;
-//     char* str;
-//     va_start(args, msg);
-//     
-//     while(1){
-// 	str = va_arg(args, char*);
-// 	if(strcmp(str, "\0")==0){
-// 	    break;
-// 	}
-// 	std::cout<<str;
-//     }
-//     std::cout<<std::endl;
-//     std::cout.flush();
-//     va_end(args);
-//     return;
-// }
+
 
 }
 
