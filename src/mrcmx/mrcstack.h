@@ -65,6 +65,8 @@ public:
   void ReadBlock(int start, int end, char axis,
                  float *blockdata); // not include end
 
+  void savedate(char *cur, float *blockdata, long long offset,long long size);
+
   template <typename T>
   MPI_Datatype get_mpi_type();
 

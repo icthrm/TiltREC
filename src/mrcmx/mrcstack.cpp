@@ -26,7 +26,7 @@ bool MrcStackM::WriteToFile(const char *filename)
 
     fprintf(stderr, "%s\n", error_string);
 
-    return false; 
+    return false;
   }
 
   size_t psize;
@@ -252,6 +252,40 @@ void MrcStackM::ReadSlice(int slcN, char axis, float *slcdata)
   delete[] buf;
 }
 
+void MrcStackM::savedate(char *cur, float *blockdata, long long offset,long long size)
+{
+  switch (header.mode)
+  {
+  case MODE_BYTE:
+    for (int i = 0; i < size; ++i)
+    {
+      blockdata[offset + i] = static_cast<float>(cur[i]);
+    }
+    break;
+
+  case MODE_SHORT:
+    for (int i = 0; i < size; ++i)
+    {
+      blockdata[offset + i] =
+          static_cast<float>(reinterpret_cast<short *>(cur)[i]);
+    }
+    break;
+
+  case MODE_FLOAT:
+    for (int i = 0; i < size; ++i)
+    {
+      blockdata[static_cast<long long>(offset + i)] =
+          static_cast<float>(reinterpret_cast<float *>(cur)[i]);
+    }
+
+    break;
+
+  default:
+    printf("File type unknown!\n");
+    return;
+  }
+}
+
 void MrcStackM::ReadSliceX(int slcN, float *slcdata)
 {
   ReadSlice(slcN, 'x', slcdata);
@@ -361,6 +395,7 @@ void MrcStackM::ReadBlock(int start, int end, char axis, float *blockdata)
     MPI_File_seek(mpifile, glboffset + slcN * slcsize, MPI_SEEK_SET);
     MPI_File_read(mpifile, buf, slcsize * thickness, MPI_CHAR,
                   MPI_STATUS_IGNORE);
+    savedate(buf, blockdata, 0,bufsize);
     break;
 
   case 'x':
@@ -370,7 +405,6 @@ void MrcStackM::ReadBlock(int start, int end, char axis, float *blockdata)
     for (slcN; slcN < end; slcN++)
     {
       char *cur = buf + (slcN - start) * header.nz * header.ny * psize;
-      ;
 
       for (int k = 0; k < header.nz; k++)
       {
@@ -384,24 +418,35 @@ void MrcStackM::ReadBlock(int start, int end, char axis, float *blockdata)
         }
       }
     }
+    savedate(buf, blockdata, 0,bufsize);
     break;
 
   case 'y':
   case 'Y':
-    bufsize = header.nz * header.nx * thickness;
+    bufsize = header.nz * header.nx;
     buf = new char[bufsize * psize];
     for (slcN; slcN < end; slcN++)
     {
-      char *cur = buf + (slcN - start) * header.nz * header.nx * psize;
+      char *cur = buf;
 
       for (int k = 0; k < header.nz; k++)
       {
         MPI_File_seek(mpifile,
                       glboffset + slcN * header.nx * psize + k * slcsize,
                       MPI_SEEK_SET);
-        MPI_File_read(mpifile, cur + k * header.nx * psize, header.nx * psize,
-                      MPI_CHAR, MPI_STATUS_IGNORE);
+        int mpi_error =
+            MPI_File_read(mpifile, cur + k * header.nx * psize,
+                          header.nx * psize, MPI_CHAR, MPI_STATUS_IGNORE);
+        if (mpi_error != MPI_SUCCESS)
+        {
+          char error_msg[128];
+          int error_len;
+          MPI_Error_string(mpi_error, error_msg, &error_len);
+          printf("Error: %s\n", error_msg);
+        }
       }
+      long long offset = static_cast<long long>(static_cast<long long>(slcN - start) * static_cast<long long>(header.nz) * static_cast<long long>(header.nx));
+      savedate(cur, blockdata, offset,header.nx*header.nz);
     }
     break;
 
@@ -409,33 +454,7 @@ void MrcStackM::ReadBlock(int start, int end, char axis, float *blockdata)
     break;
   }
 
-  switch (header.mode)
-  {
-  case MODE_BYTE:
-    for (int i = bufsize; i--;)
-    {
-      blockdata[i] = ((unsigned char *)buf)[i];
-    }
-
-    break;
-
-  case MODE_SHORT:
-    for (int i = bufsize; i--;)
-    {
-      blockdata[i] = ((short *)buf)[i];
-    }
-
-    break;
-
-  case MODE_FLOAT:
-    memcpy(blockdata, buf, sizeof(float) * bufsize);
-
-    break;
-
-  default:
-    printf("File type unknown!\n");
-  }
-
+  
   delete[] buf;
 }
 
@@ -453,7 +472,7 @@ MPI_Datatype MrcStackM::get_mpi_type<float>()
 template <typename T>
 void MrcStackM::WriteBlock(int start, int end, char axis, float *blockdata)
 {
-    int psize = sizeof(T);
+  int psize = sizeof(T);
   size_t del = end - start;
 
   MPI_Offset offset = sizeof(MrcHeader) + header.next;

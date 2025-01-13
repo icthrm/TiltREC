@@ -791,7 +791,7 @@ int ATOM(options &opt, int myid, int procs)
 	}
 
 	long long projsize;
-	calculate_prosize(length, projs.X(), projs.Z,projsize);
+	calculate_prosize(length, projs.X(), projs.Z(),projsize);
 	float *tmp = nullptr;
 	try
 	{
